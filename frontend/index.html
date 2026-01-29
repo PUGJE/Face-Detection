@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Recognition Attendance System</title>
+    <link rel="stylesheet" href="static/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <i class="fas fa-user-check"></i>
+                <span>Smart Attendance</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="#dashboard" class="nav-link active" data-page="dashboard">
+                    <i class="fas fa-home"></i> Dashboard
+                </a></li>
+                <li><a href="#register" class="nav-link" data-page="register">
+                    <i class="fas fa-user-plus"></i> Register
+                </a></li>
+                <li><a href="#attendance" class="nav-link" data-page="attendance">
+                    <i class="fas fa-camera"></i> Mark Attendance
+                </a></li>
+                <li><a href="#students" class="nav-link" data-page="students">
+                    <i class="fas fa-users"></i> Students
+                </a></li>
+                <li><a href="#reports" class="nav-link" data-page="reports">
+                    <i class="fas fa-chart-bar"></i> Reports
+                </a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Dashboard Page -->
+        <div id="dashboard-page" class="page active">
+            <div class="container">
+                <h1 class="page-title">
+                    <i class="fas fa-home"></i>
+                    Dashboard
+                </h1>
+
+                <!-- Statistics Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 id="total-students">0</h3>
+                            <p>Total Students</p>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                            <i class="fas fa-user-check"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 id="today-present">0</h3>
+                            <p>Present Today</p>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                            <i class="fas fa-user-times"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 id="today-absent">0</h3>
+                            <p>Absent Today</p>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                            <i class="fas fa-percentage"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 id="attendance-rate">0%</h3>
+                            <p>Attendance Rate</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Today's Attendance -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-calendar-day"></i> Today's Attendance</h2>
+                        <button class="btn btn-primary" onclick="refreshDashboard()">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="today-attendance-list" class="attendance-list">
+                            <p class="text-center text-muted">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Register Page -->
+        <div id="register-page" class="page">
+            <div class="container">
+                <h1 class="page-title">
+                    <i class="fas fa-user-plus"></i>
+                    Register New Student
+                </h1>
+
+                <div class="form-grid">
+                    <!-- Student Information Form -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h2><i class="fas fa-id-card"></i> Student Information</h2>
+                        </div>
+                        <div class="card-body">
+                            <form id="student-form">
+                                <div class="form-group">
+                                    <label for="student-id">Student ID *</label>
+                                    <input type="text" id="student-id" class="form-control" required 
+                                           placeholder="e.g., CS2024001">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="student-name">Full Name *</label>
+                                    <input type="text" id="student-name" class="form-control" required
+                                           placeholder="e.g., John Doe">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="student-email">Email</label>
+                                    <input type="email" id="student-email" class="form-control"
+                                           placeholder="e.g., john@example.com">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="student-enrollment">Enrollment Number</label>
+                                    <input type="text" id="student-enrollment" class="form-control"
+                                           placeholder="e.g., EN2024001">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="student-department">Department</label>
+                                    <input type="text" id="student-department" class="form-control"
+                                           placeholder="e.g., Computer Science">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="student-year">Year/Class</label>
+                                    <input type="text" id="student-year" class="form-control"
+                                           placeholder="e.g., 3rd Year">
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Face Capture -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h2><i class="fas fa-camera"></i> Capture Face</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="webcam-container">
+                                <video id="register-video" autoplay playsinline></video>
+                                <canvas id="register-canvas" style="display: none;"></canvas>
+                                <div id="register-preview" class="preview-image" style="display: none;">
+                                    <img id="register-preview-img" alt="Preview">
+                                </div>
+                            </div>
+
+                            <div class="button-group">
+                                <button class="btn btn-secondary" id="start-camera-btn" onclick="startCamera('register')">
+                                    <i class="fas fa-video"></i> Start Camera
+                                </button>
+                                <button class="btn btn-primary" id="capture-btn" onclick="captureImage()" disabled>
+                                    <i class="fas fa-camera"></i> Capture
+                                </button>
+                                <button class="btn btn-success" id="register-btn" onclick="registerStudent()" disabled>
+                                    <i class="fas fa-check"></i> Register Student
+                                </button>
+                            </div>
+
+                            <div id="register-status" class="status-message"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mark Attendance Page -->
+        <div id="attendance-page" class="page">
+            <div class="container">
+                <h1 class="page-title">
+                    <i class="fas fa-camera"></i>
+                    Mark Attendance
+                </h1>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-user-check"></i> Face Recognition</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="webcam-container">
+                            <video id="attendance-video" autoplay playsinline></video>
+                            <canvas id="attendance-canvas" style="display: none;"></canvas>
+                        </div>
+
+                        <div class="button-group">
+                            <button class="btn btn-secondary" id="start-attendance-camera-btn" onclick="startCamera('attendance')">
+                                <i class="fas fa-video"></i> Start Camera
+                            </button>
+                            <button class="btn btn-success" id="mark-attendance-btn" onclick="markAttendance()" disabled>
+                                <i class="fas fa-check"></i> Mark Attendance
+                            </button>
+                        </div>
+
+                        <div id="attendance-status" class="status-message"></div>
+                    </div>
+                </div>
+
+                <!-- Recent Attendance -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-history"></i> Recent Attendance</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="recent-attendance-list" class="attendance-list">
+                            <p class="text-center text-muted">No attendance records yet</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Students Page -->
+        <div id="students-page" class="page">
+            <div class="container">
+                <h1 class="page-title">
+                    <i class="fas fa-users"></i>
+                    Students
+                </h1>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-list"></i> All Students</h2>
+                        <div class="search-box">
+                            <input type="text" id="search-input" class="form-control" placeholder="Search students...">
+                            <i class="fas fa-search"></i>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="students-list" class="students-grid">
+                            <p class="text-center text-muted">Loading students...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports Page -->
+        <div id="reports-page" class="page">
+            <div class="container">
+                <h1 class="page-title">
+                    <i class="fas fa-chart-bar"></i>
+                    Reports & Analytics
+                </h1>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-calendar-alt"></i> Attendance by Date</h2>
+                        <input type="date" id="report-date" class="form-control" style="max-width: 200px;">
+                    </div>
+                    <div class="card-body">
+                        <div id="date-attendance-list" class="attendance-list">
+                            <p class="text-center text-muted">Select a date to view attendance</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-user-graduate"></i> Student Statistics</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="student-stats-list">
+                            <p class="text-center text-muted">Loading statistics...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+        <div class="spinner"></div>
+        <p>Processing...</p>
+    </div>
+
+    <script src="static/js/app.js"></script>
+</body>
+</html>
