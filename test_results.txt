@@ -1,0 +1,11 @@
+============================= test session starts ==============================
+✓ Directory ensured: ./data/student_images
+✓ Directory ensured: ./data/embeddings
+✓ Directory ensured: ./data/logs
+✓ Directory ensured: ./models
+✓ Directory ensured: ./models/facenet_model
+✓ Directory ensured: ./models/anti_spoofing_model
+✓ Directory ensured: ./data
+collected 42 items
+
+test_anti_spoofing.py 

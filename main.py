@@ -56,7 +56,7 @@ app.add_middleware(
 
 # Mount static files
 frontend_path = Path(__file__).parent / "frontend"
-if frontend_path.exists():
+if (frontend_path / "static").exists():
     app.mount("/static", StaticFiles(directory=str(frontend_path / "static")), name="static")
     logger.info(f"Static files mounted from: {frontend_path / 'static'}")
 
@@ -105,20 +105,29 @@ async def health_check():
 @app.get("/app", response_class=HTMLResponse)
 async def serve_frontend():
     """Serve the frontend application"""
-    frontend_file = Path(__file__).parent / "frontend" / "index.html"
+    frontend_file = Path(__file__).parent / "frontend" / "out" / "index.html"
     if frontend_file.exists():
         return FileResponse(frontend_file)
     else:
-        return HTMLResponse("<h1>Frontend not found</h1><p>Please ensure frontend files are in the 'frontend' directory</p>", status_code=404)
+        return HTMLResponse("<h1>Frontend not found</h1><p>Next.js is handling development natively at port 3000, or you need to run 'npm run build' inside frontend/</p>", status_code=404)
 
 @app.get("/api/stats")
-async def get_system_stats():
+async def get_system_stats(db: Session = Depends(get_db)):
     """Get overall system statistics"""
     try:
         stats = attendance_system.get_system_stats()
+        # Also pull live DB student count so dashboard is always accurate
+        service = StudentService(db)
+        students = service.get_all_students(active_only=True)
+        recognizer_stats = stats.get("face_recognition", {}).get("recognizer", {})
+        recognizer_stats["total_faces"] = len(students)
+        recognizer_stats["model_name"] = recognizer_stats.get("model_name", "HOG+Cosine")
         return {
             "success": True,
-            "data": stats
+            "data": {
+                **stats,
+                "recognizer": recognizer_stats,   # top-level for dashboard
+            }
         }
     except Exception as e:
         logger.error(f"Error getting stats: {e}")

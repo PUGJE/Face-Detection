@@ -80,7 +80,10 @@ venv\Scripts\activate
 **Linux/macOS:**
 ```bash
 python3 -m venv venv
+# For bash/zsh
 source venv/bin/activate
+# For fish shell
+source venv/bin/activate.fish
 ```
 
 You should see `(venv)` in your terminal prompt.
@@ -264,7 +267,10 @@ python test_simple_antispoofing.py
 venv\Scripts\activate
 
 # Linux/macOS
+# For bash/zsh
 source venv/bin/activate
+# For fish shell
+source venv/bin/activate.fish
 
 # Reinstall dependencies
 pip install -r requirements.txt
@@ -448,7 +454,10 @@ Face Recognition Attendance System
 venv\Scripts\activate
 
 # Linux/macOS
+# For bash/zsh
 source venv/bin/activate
+# For fish shell
+source venv/bin/activate.fish
 
 # Start server
 python main.py
