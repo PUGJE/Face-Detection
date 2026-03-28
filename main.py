@@ -30,6 +30,7 @@ from backend.database.connection import get_db, init_database
 from backend.services.student_service import StudentService
 from backend.services.attendance_service import AttendanceService
 from backend.attendance_system import AttendanceSystem
+from backend.ml.recognition_pipeline import embed_face_crop
 from backend.config import settings
 
 # Configure logging
@@ -362,6 +363,88 @@ async def register_student_face(
     except Exception as e:
         logger.error(f"Error registering face: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================================================
+# BROWSER-CROP ENDPOINTS (Win 2 — frontend does detection, server does ArcFace only)
+# ============================================================================
+
+@app.post("/api/students/{student_id}/register-face-crop")
+async def register_face_from_browser_crop(
+    student_id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Register face using a pre-cropped face image detected in the browser.
+    Skips server-side RetinaFace — runs ArcFace only.
+    """
+    try:
+        contents = await file.read()
+        nparr = np.frombuffer(contents, np.uint8)
+        crop = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if crop is None:
+            raise HTTPException(status_code=400, detail="Invalid image")
+
+        service = StudentService(db)
+        if not service.get_student(student_id):
+            raise HTTPException(status_code=404, detail="Student not found")
+
+        embedding = embed_face_crop(crop)
+        if embedding is None:
+            raise HTTPException(status_code=400, detail="ArcFace embedding failed — check crop quality")
+
+        ok = attendance_system.face_pipeline.recognizer.add_embedding(student_id, embedding)
+        if not ok:
+            raise HTTPException(status_code=500, detail="Failed to store embedding")
+
+        service.register_face(student_id)
+        attendance_system.face_pipeline.save_database()
+
+        return {"success": True, "message": "Face registered (browser-crop path)", "student_id": student_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"register-face-crop error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/attendance/mark-crop")
+async def mark_attendance_from_browser_crop(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Mark attendance using a pre-cropped face image detected in the browser.
+    Skips server-side RetinaFace — runs ArcFace + FAISS only (~5ms).
+    """
+    try:
+        contents = await file.read()
+        nparr = np.frombuffer(contents, np.uint8)
+        crop = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if crop is None:
+            raise HTTPException(status_code=400, detail="Invalid image")
+
+        embedding = embed_face_crop(crop)
+        if embedding is None:
+            return {"success": False, "error": "Could not extract embedding from crop"}
+
+        result = attendance_system.face_pipeline.recognizer.recognize_from_embedding(embedding)
+        if result is None:
+            return {"success": False, "error": "Face not recognised"}
+
+        service = AttendanceService(db)
+        att = service.mark_attendance(
+            student_id=result["student_id"],
+            recognition_confidence=result["confidence"],
+            recognition_distance=result["distance"],
+        )
+        return att
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"mark-crop error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # ============================================================================
 # ATTENDANCE ENDPOINTS

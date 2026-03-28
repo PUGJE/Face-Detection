@@ -17,9 +17,41 @@ export default function StudentsPage() {
   const [registering, setRegistering] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
+  // Detector State
+  const detectorRef = useRef<any>(null);
+  const [detectorStatus, setDetectorStatus] = useState<"loading" | "ready">("loading");
+
   useEffect(() => {
     fetchStudents();
+    initMediaPipe();
+    return () => {
+      stopWebcam();
+      if (detectorRef.current && typeof detectorRef.current.close === "function") {
+        detectorRef.current.close();
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const initMediaPipe = async () => {
+    try {
+      const { FaceDetector, FilesetResolver } = await import("@mediapipe/tasks-vision");
+      const vision = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+      );
+      const fd = await FaceDetector.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite`,
+          delegate: "GPU",
+        },
+        runningMode: "IMAGE",
+      });
+      detectorRef.current = fd;
+      setDetectorStatus("ready");
+    } catch (e) {
+      console.error("MediaPipe failed to load:", e);
+    }
+  };
 
   const fetchStudents = async () => {
     try {
@@ -66,37 +98,79 @@ export default function StudentsPage() {
 
   const captureAndRegister = async () => {
     if (!videoRef.current || !selectedStudentId) return;
+    if (detectorStatus !== "ready" || !detectorRef.current) {
+      alert("Face detector is still loading. Please wait.");
+      return;
+    }
     
     setRegistering(true);
     const canvas = document.createElement("canvas");
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
-    canvas.getContext("2d")?.drawImage(videoRef.current, 0, 0);
-    
-    canvas.toBlob(async (blob) => {
-      if (!blob) { setRegistering(false); return; }
-      const formData = new FormData();
-      formData.append("file", blob, "face.jpg");
+    canvas.width = videoRef.current.videoWidth || 640;
+    canvas.height = videoRef.current.videoHeight || 480;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) { setRegistering(false); return; }
+    ctx.drawImage(videoRef.current, 0, 0);
 
-      try {
-        const res = await fetch(`/api/students/${selectedStudentId}/register-face`, {
-          method: "POST",
-          body: formData
-        });
-        if (res.ok) {
-          alert("Face Registered Successfully!");
-          stopWebcam();
-          fetchStudents();
-        } else {
-          const data = await res.json();
-          alert("Error: " + data.detail);
-        }
-      } catch (e) {
-        console.error(e);
-      } finally {
+    try {
+      // 1. Client-side face detection
+      const { detections } = detectorRef.current.detect(canvas);
+      
+      if (!detections || detections.length === 0) {
+        alert("No clear face detected! Please look straight into the camera.");
         setRegistering(false);
+        return;
       }
-    }, "image/jpeg", 0.9);
+      
+      const face = detections[0].boundingBox;
+      if (!face) {
+        alert("Could not extract face bounds.");
+        setRegistering(false);
+        return;
+      }
+
+      // 2. Crop the face (with 25% padding so ArcFace sees full context)
+      const padX = face.width * 0.25;
+      const padY = face.height * 0.25;
+      const sx = Math.max(0, face.originX - padX);
+      const sy = Math.max(0, face.originY - padY);
+      const sw = Math.min(canvas.width - sx, face.width + 2 * padX);
+      const sh = Math.min(canvas.height - sy, face.height + 2 * padY);
+
+      const cropCanvas = document.createElement("canvas");
+      cropCanvas.width = sw;
+      cropCanvas.height = sh;
+      cropCanvas.getContext("2d")?.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+      
+      // 3. Send ONLY the cropped 112x112ish face to the backend ArcFace
+      cropCanvas.toBlob(async (blob) => {
+        if (!blob) { setRegistering(false); return; }
+        const formData = new FormData();
+        formData.append("file", blob, "crop.jpg");
+
+        try {
+          const res = await fetch(`/api/students/${selectedStudentId}/register-face-crop`, {
+            method: "POST",
+            body: formData
+          });
+          if (res.ok) {
+            alert("Face Registered Successfully!");
+            stopWebcam();
+            fetchStudents();
+          } else {
+            const data = await res.json();
+            alert("Error: " + data.detail);
+          }
+        } catch (e) {
+          console.error(e);
+        } finally {
+          setRegistering(false);
+        }
+      }, "image/jpeg", 0.9);
+    } catch (e) {
+      console.error(e);
+      alert("Error processing the image");
+      setRegistering(false);
+    }
   };
 
   const stopWebcam = () => {
@@ -144,7 +218,14 @@ export default function StudentsPage() {
 
         {/* Student List & Face Reg */}
         <div className="lg:col-span-2 glass-panel rounded-2xl p-6">
-          <h2 className="text-xl font-bold text-white mb-6">Registered Database</h2>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold text-white">Registered Database</h2>
+            {detectorStatus === "loading" && (
+              <span className="flex items-center gap-2 text-sm text-amber-400 bg-amber-400/10 px-3 py-1.5 rounded-full">
+                <Loader2 className="w-4 h-4 animate-spin" /> Loading ML Engine...
+              </span>
+            )}
+          </div>
 
           {selectedStudentId && (
             <div className="mb-6 p-4 rounded-xl bg-slate-900/50 border border-slate-800">
@@ -155,7 +236,7 @@ export default function StudentsPage() {
               <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden border border-slate-700">
                 <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
               </div>
-              <button disabled={registering} onClick={captureAndRegister} className="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 transition text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2">
+              <button disabled={registering || detectorStatus !== "ready"} onClick={captureAndRegister} className="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 transition text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                 {registering ? <Loader2 className="animate-spin" /> : <UploadCloud />} Capture & Register
               </button>
             </div>
@@ -189,7 +270,7 @@ export default function StudentsPage() {
                             <span className="text-rose-400 bg-rose-400/10 px-2 py-1 rounded text-xs font-bold">Pending</span>}
                         </td>
                         <td className="px-4 py-3">
-                          <button onClick={() => startWebcam(s.student_id)} className="text-blue-400 hover:text-blue-300 text-sm font-medium">Add Face</button>
+                          <button onClick={() => startWebcam(s.student_id)} disabled={detectorStatus !== "ready"} className="text-blue-400 hover:text-blue-300 text-sm font-medium disabled:opacity-50">Add Face</button>
                         </td>
                       </tr>
                     ))
