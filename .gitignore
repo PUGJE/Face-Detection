@@ -1,78 +1,56 @@
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
+*.pyo
 *.egg-info/
-.installed.cfg
-*.egg
+dist/
+build/
+*.so
 
-# Virtual Environment
+# Virtual environments
 venv/
+venv_314/
+.venv/
 env/
-ENV/
-.venv
 
-# IDE
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Database
+*.sqlite
+*.db
+data/embeddings/*.pkl
+data/embeddings/*.yml
+data/logs/
+data/student_images/
+
+# Pytest / test artifacts
+.pytest_cache/
+*.json
+test_*.jpg
+test_*.txt
+test_*.png
+
+# Node / Next.js
+node_modules/
+.next/
+frontend/.next/
+frontend/node_modules/
+
+# Editor
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
 
-# Environment Variables
-.env
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
-data/database/*.db
-
-# Logs
+# Misc
 *.log
-data/logs/*.log
-
-# Face Data (Sensitive)
-data/student_images/*
-!data/student_images/.gitkeep
-data/embeddings/*
-!data/embeddings/.gitkeep
-
-# ML Models (Large files)
-models/facenet_model/*
-!models/facenet_model/.gitkeep
-models/anti_spoofing_model/*
-!models/anti_spoofing_model/.gitkeep
-
-# OS
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Jupyter Notebooks
-.ipynb_checkpoints/
-*.ipynb
-
-# Temporary files
 *.tmp
-*.bak
-*.swp
+Thumbs.db
+.DS_Store
+
+# Model weights (downloaded at runtime)
+models/facenet_model/
+models/anti_spoofing_model/

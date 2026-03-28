@@ -1,1 +1,0 @@
-/home/pbsmarta/Documents/Face-Detection/venv/bin/python: No module named pylint
