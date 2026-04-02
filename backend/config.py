@@ -34,7 +34,7 @@ class Settings(BaseSettings):
 
     # ── Database ─────────────────────────────────────────────────────────────
     database_url: str = Field(
-        default="sqlite:///./data/database/attendance.db",
+        default="postgresql://postgres:password@db.your-project.supabase.co:5432/postgres",
         env="DATABASE_URL",
     )
 
@@ -113,7 +113,6 @@ class Settings(BaseSettings):
             self.models_path,
             self.facenet_model_path,
             self.anti_spoofing_model_path,
-            os.path.dirname(self.database_url.replace("sqlite:///", "")),
         ]
         for d in dirs:
             if d:  # skip empty strings

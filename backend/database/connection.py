@@ -1,18 +1,25 @@
 """
 Database Connection and Session Management
 
-This module handles database connection, session creation, and initialization.
+Connects to a PostgreSQL database (Supabase) via SQLAlchemy.
+The DATABASE_URL environment variable must be set to a valid
+PostgreSQL connection string, e.g.:
+  postgresql://postgres:[PASSWORD]@db.[PROJECT].supabase.co:5432/postgres
+
+All public symbols are unchanged from the SQLite version so no
+other module requires any edits:
+  - db_manager   : DatabaseManager instance
+  - get_db()     : FastAPI dependency that yields a Session
+  - init_database(): creates tables on first run
 
 Author: Face Recognition Team
-Date: January 2026
 """
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.pool import StaticPool
-from contextlib import contextmanager
-from pathlib import Path
 import logging
+from contextlib import contextmanager
+
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker, Session
 
 from backend.models.student import Base, Student, Attendance, User
 from backend.config import settings
@@ -22,111 +29,128 @@ logger = logging.getLogger(__name__)
 
 class DatabaseManager:
     """
-    Database Manager for SQLite
-    
-    Handles connection, session management, and initialization
+    Database Manager for PostgreSQL (Supabase)
+
+    Handles connection pooling, session management, and schema
+    initialisation.  Uses the DATABASE_URL from settings/env.
     """
-    
+
     def __init__(self, database_url: str = None):
-        """
-        Initialize database manager
-        
-        Args:
-            database_url (str): Database URL (uses config if None)
-        """
         if database_url is None:
             database_url = settings.database_url
-        
+
         self.database_url = database_url
         self.engine = None
         self.SessionLocal = None
-        
+
         self._initialize()
-    
+
     def _initialize(self):
-        """Initialize database engine and session factory"""
-        # Create database directory if needed
-        if self.database_url.startswith('sqlite:///'):
-            db_path = self.database_url.replace('sqlite:///', '')
-            Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-        
-        # Create engine
-        # For SQLite, we use check_same_thread=False to allow multi-threading
-        connect_args = {"check_same_thread": False} if 'sqlite' in self.database_url else {}
-        
+        """Create the SQLAlchemy engine with PostgreSQL-tuned pool settings."""
         self.engine = create_engine(
             self.database_url,
-            connect_args=connect_args,
-            echo=False  # Set to True for SQL query logging
+            # Connection pool settings — sensible defaults for a hosted DB
+            pool_size=5,          # keep 5 connections warm
+            max_overflow=10,      # allow up to 10 extra connections under load
+            pool_timeout=30,      # wait up to 30s for a connection from the pool
+            pool_recycle=1800,    # recycle connections every 30 min (avoids stale conns)
+            pool_pre_ping=True,   # test connection health before using from pool
+            echo=False,           # set True to log all SQL queries
         )
-        
-        # Create session factory
+
         self.SessionLocal = sessionmaker(
             autocommit=False,
             autoflush=False,
-            bind=self.engine
+            bind=self.engine,
         )
-        
-        logger.info(f"Database engine created: {self.database_url}")
-    
+
+        logger.info(f"Database engine created: {self._safe_url()}")
+
+    def _safe_url(self) -> str:
+        """Return the database URL with the password redacted for logging."""
+        try:
+            from urllib.parse import urlparse, urlunparse
+            parsed = urlparse(self.database_url)
+            redacted = parsed._replace(netloc=parsed.netloc.replace(
+                parsed.password or "", "****"
+            ))
+            return urlunparse(redacted)
+        except Exception:
+            return "<database_url>"
+
+    # ------------------------------------------------------------------
+    # Table management
+    # ------------------------------------------------------------------
+
     def create_tables(self):
-        """Create all tables in the database"""
+        """Create all ORM-defined tables if they don't already exist."""
         Base.metadata.create_all(bind=self.engine)
-        logger.info("Database tables created successfully")
-    
+        logger.info("Database tables verified / created.")
+
     def drop_tables(self):
-        """Drop all tables (use with caution!)"""
+        """Drop all tables — use with extreme caution!"""
         Base.metadata.drop_all(bind=self.engine)
-        logger.warning("All database tables dropped")
-    
+        logger.warning("All database tables dropped.")
+
+    def reset_database(self):
+        """Drop and recreate all tables (destructive!)."""
+        logger.warning("Resetting database …")
+        self.drop_tables()
+        self.create_tables()
+        logger.info("Database reset complete.")
+
+    # ------------------------------------------------------------------
+    # Session helpers
+    # ------------------------------------------------------------------
+
     def get_session(self) -> Session:
-        """
-        Get a new database session
-        
-        Returns:
-            Session: SQLAlchemy session
-        """
+        """Return a new SQLAlchemy session (caller is responsible for closing)."""
         return self.SessionLocal()
-    
+
     @contextmanager
     def session_scope(self):
         """
-        Provide a transactional scope for database operations
-        
+        Transactional context manager.
+
         Usage:
             with db_manager.session_scope() as session:
-                session.add(student)
+                session.add(obj)
         """
         session = self.SessionLocal()
         try:
             yield session
             session.commit()
-        except Exception as e:
+        except Exception as exc:
             session.rollback()
-            logger.error(f"Database error: {e}")
+            logger.error(f"Database error (rolled back): {exc}")
             raise
         finally:
             session.close()
-    
-    def reset_database(self):
-        """Reset database (drop and recreate all tables)"""
-        logger.warning("Resetting database...")
-        self.drop_tables()
-        self.create_tables()
-        logger.info("Database reset complete")
+
+    def health_check(self) -> bool:
+        """Return True if the database is reachable."""
+        try:
+            with self.engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            return True
+        except Exception as exc:
+            logger.error(f"Database health check failed: {exc}")
+            return False
 
 
-# Global database manager instance
+# ---------------------------------------------------------------------------
+# Global singleton — imported by services, routes, and attendance_system
+# ---------------------------------------------------------------------------
 db_manager = DatabaseManager()
 
 
 def get_db():
     """
-    Dependency function for FastAPI to get database session
-    
-    Usage in FastAPI:
-        @app.get("/students")
-        def get_students(db: Session = Depends(get_db)):
+    FastAPI dependency — yields a Session and closes it after the request.
+
+    Usage:
+        @router.get("/students")
+        def list_students(db: Session = Depends(get_db)):
             ...
     """
     db = db_manager.get_session()
@@ -137,31 +161,31 @@ def get_db():
 
 
 def init_database():
-    """Initialize database (create tables if they don't exist)"""
+    """Called at application startup to ensure all tables exist."""
     db_manager.create_tables()
-    logger.info("Database initialized")
+    logger.info("Database initialised.")
 
 
-# Test function
+# ---------------------------------------------------------------------------
+# Manual smoke-test
+# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     print("=" * 60)
     print("DATABASE CONNECTION TEST")
     print("=" * 60)
-    
-    # Initialize database
-    print("\nInitializing database...")
-    init_database()
-    
-    # Test session
-    print("\nTesting database session...")
-    with db_manager.session_scope() as session:
-        # Count students
-        student_count = session.query(Student).count()
-        print(f"Current students in database: {student_count}")
-        
-        # Count attendance records
-        attendance_count = session.query(Attendance).count()
-        print(f"Current attendance records: {attendance_count}")
-    
-    print("\n✓ Database connection test successful!")
-    print(f"Database location: {settings.database_url}")
+
+    print("\nChecking connectivity …")
+    ok = db_manager.health_check()
+    print(f"  Health check: {'✓ OK' if ok else '✗ FAILED'}")
+
+    if ok:
+        print("\nInitialising tables …")
+        init_database()
+
+        with db_manager.session_scope() as s:
+            students = s.query(Student).count()
+            records  = s.query(Attendance).count()
+            print(f"  Students : {students}")
+            print(f"  Attendance records: {records}")
+
+        print(f"\n✓ Connected to: {db_manager._safe_url()}")
