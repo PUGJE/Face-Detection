@@ -17,8 +17,13 @@ import logging
 from typing import Optional
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
 from sqlalchemy.orm import Session
+import time
+
+# 10s cooldown cache for optimistic attendance latency reduction
+_RECENT_SCANS = {}
+SCAN_COOLDOWN_SECONDS = 10
 
 from backend.database.connection import get_db
 from backend.services.attendance_service import AttendanceService
@@ -69,16 +74,21 @@ async def mark_attendance_full_pipeline(
 
 @router.post("/api/attendance/mark-crop")
 async def mark_attendance_browser_crop(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
     """
     Mark attendance from a browser-detected face crop (~5 ms server-side).
-
-    The frontend crops the face (MediaPipe), so the server skips RetinaFace
-    and runs only ArcFace + FAISS for identification.
+    Uses optimistic caching and BackgroundTasks to eliminate database latency!
     """
     try:
+        global _RECENT_SCANS
+        now = time.time()
+        
+        # Cleanup expired cache loosely
+        _RECENT_SCANS = {k: v for k, v in _RECENT_SCANS.items() if now - v < SCAN_COOLDOWN_SECONDS * 2}
+
         crop = await decode_image_upload(file)
 
         embedding = embed_face_crop(crop)
@@ -90,12 +100,54 @@ async def mark_attendance_browser_crop(
         if match is None:
             return {"success": False, "error": "Face not recognised"}
 
-        result = AttendanceService(db).mark_attendance(
-            student_id=match["student_id"],
-            recognition_confidence=match["confidence"],
-            recognition_distance=match["distance"],
+        student_id = match["student_id"]
+
+        # Cache check to prevent rapid-fire requests
+        last_scan = _RECENT_SCANS.get(student_id, 0)
+        if now - last_scan < SCAN_COOLDOWN_SECONDS:
+            return {
+                "success": False,
+                "duplicate": True,
+                "message": "Recently marked (optimistic buffer)"
+            }
+
+        _RECENT_SCANS[student_id] = now
+
+        # We need the user's name for the frontend UI. 1 fast SQL lookup here.
+        from backend.models.student import Student
+        student = db.query(Student).filter(Student.student_id == student_id).first()
+        student_name = student.name if student else student_id
+
+        def _bg_mark_attendance(sid, conf, dist):
+            from backend.database.connection import db_manager
+            try:
+                with db_manager.session_scope() as session:
+                    AttendanceService(session).mark_attendance(
+                        student_id=sid,
+                        recognition_confidence=conf,
+                        recognition_distance=dist,
+                    )
+            except Exception as e:
+                logger.error(f"Background DB write failed for {sid}: {e}")
+
+        # Dispatch background task so the frontend unblocks IMMEDIATELY
+        background_tasks.add_task(
+            _bg_mark_attendance,
+            student_id,
+            match["confidence"],
+            match["distance"]
         )
-        return result
+
+        return {
+            "success": True,
+            "message": "Attendance queued successfully",
+            "data": {
+                "student_id": student_id,
+                "student_name": student_name,
+                "status": "present", # Optimistic status
+                "recognition_confidence": match["confidence"]
+            }
+        }
     except HTTPException:
         raise
     except Exception as e:
