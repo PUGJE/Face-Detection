@@ -15,18 +15,19 @@ passlib[bcrypt]>=1.7.4
 python-dotenv>=1.0.0
 
 # Computer Vision & Image Processing
-opencv-python
-opencv-contrib-python
-mediapipe
+opencv-python>=4.8.0
+opencv-contrib-python>=4.8.0
 Pillow>=10.2.0
 
 # Deep Learning & Face Recognition
-scikit-learn>=1.4.0
-scikit-image>=0.22.0
-scipy>=1.12.0
+insightface>=0.7.3          # RetinaFace detection + ArcFace recognition (ONNX)
+onnxruntime>=1.16.0         # ONNX inference backend for InsightFace models
+faiss-cpu>=1.7.4            # FAISS vector index for fast embedding search
+scikit-image>=0.22.0        # LBP texture analysis (anti-spoofing)
+scipy>=1.12.0               # ndimage (anti-spoofing)
 
 # Data Processing
-numpy
+numpy>=1.26.0
 pandas>=2.1.4
 
 # Utilities
@@ -37,6 +38,3 @@ requests>=2.31.0
 pytest>=7.4.4
 pytest-asyncio>=0.23.3
 httpx>=0.26.0
-
-# CORS Support
-fastapi-cors>=0.0.6
