@@ -1,26 +1,24 @@
 """
-Face Detection Module natively using OpenCV
+Face Detection Module — OpenCV Haar Cascade
 
-This module provides face detection functionality without relying on external
-heavy frameworks like MediaPipe or TensorFlow. It guarantees 100% stability on Python 3.14.
+Provides face detection using OpenCV's built-in Haar Cascade classifier.
+This is kept as a fast, dependency-free fallback for when InsightFace
+(RetinaFace) is unavailable.
 
-Features:
-- Native Haar Cascade integration
-- High speed bounding box extraction
-- Preprocessing and cropping utilities
-
-Author: Face Recognition Team
-Date: January 2026
+Note: InsightFace (recognition_pipeline.py) is the primary detection path
+in production. This module is used only during registration when InsightFace
+fails, and for standalone testing.
 """
+
+import logging
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
-from typing import List, Tuple, Optional, Dict, Any
-from pathlib import Path
-import logging
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# NOTE: Do NOT call logging.basicConfig() here.
+# Logging configuration is the responsibility of the application entry point (main.py).
 logger = logging.getLogger(__name__)
 
 
@@ -152,14 +150,27 @@ class FaceDetector:
         pass
 
 
-def align_face(image: np.ndarray, keypoints: List[Tuple[int, int]]) -> Optional[np.ndarray]:
-    """Passthrough for compatibility gracefully handling lack of keypoints"""
+def align_face(
+    image: np.ndarray,
+    keypoints: List[Tuple[int, int]],
+) -> np.ndarray:
+    """
+    No-op alignment shim.
+
+    Haar cascades do not produce facial landmarks, so this function simply
+    returns the image unchanged. Kept for API compatibility.
+    """
     return image
 
 
-def resize_face(image: np.ndarray, target_size: Tuple[int, int] = (160, 160)) -> np.ndarray:
+def resize_face(
+    image: np.ndarray,
+    target_size: Tuple[int, int] = (160, 160),
+) -> np.ndarray:
+    """Resize a face crop to ``target_size`` using area interpolation."""
     return cv2.resize(image, target_size, interpolation=cv2.INTER_AREA)
 
 
 def normalize_face(image: np.ndarray) -> np.ndarray:
+    """Scale pixel values from [0, 255] to [0.0, 1.0]."""
     return image.astype(np.float32) / 255.0

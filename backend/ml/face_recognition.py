@@ -1,24 +1,29 @@
 """
-Face Recognition Module — FAISS-backed ArcFace Embedding Store
+Face Recognizer — FAISS-backed ArcFace Embedding Store
 
-Win 1: ONNX ✓ (InsightFace already uses ONNX Runtime — no TensorFlow)
-Win 3: FAISS — replaces the Python dict/cosine loop with IndexFlatIP
-       100x faster at scale, microsecond search for up to millions of vectors.
+Stores 512-dimensional ArcFace embeddings in a FAISS IndexFlatIP index.
+Cosine similarity is computed as inner product on L2-normalised vectors.
 
 Storage layout:
-  - FAISS IndexFlatIP (normalized vectors → cosine similarity via inner product)
-  - int64 FAISS id → student_id string (stored separately as pickle)
-  - On load, full index is rebuilt from persisted vectors
+  - FAISS IndexFlatIP (normalised vectors → cosine similarity via inner product)
+  - int64 FAISS id → student_id string (stored in _faiss_id_to_student dict)
+  - Persisted by pickling the raw {student_id: [embedding, ...]} dict; the
+    FAISS index is rebuilt from that dict on load.
+
+Threshold guide (cosine similarity, 0–1, higher = stricter match):
+    0.35 — lenient  |  0.40 — default  |  0.55 — strict
 """
 
-import numpy as np
-import faiss
-import pickle
 import logging
+import pickle
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple
 
-logging.basicConfig(level=logging.INFO)
+import faiss
+import numpy as np
+
+# NOTE: Do NOT call logging.basicConfig() here.
+# Logging configuration is the responsibility of the application entry point (main.py).
 logger = logging.getLogger(__name__)
 
 EMBED_DIM = 512   # ArcFace output dimension
@@ -94,9 +99,14 @@ class FaceRecognizer:
             logger.error(f"Failed to add embedding for '{student_id}': {e}")
             return False
 
+    # DEPRECATED — raw images cannot be embedded without the InsightFace pipeline.
+    # Use add_embedding() with a pre-computed ArcFace vector instead.
     def add_face_to_database(self, student_id: str, face_image: np.ndarray) -> bool:
-        """Legacy shim — raw images must go through InsightFace pipeline."""
-        logger.warning("add_face_to_database() called with raw image — use add_embedding().")
+        """Legacy shim — not supported in ArcFace+FAISS mode. Always returns False."""
+        logger.warning(
+            "add_face_to_database() called with raw image — "
+            "use add_embedding() with a pre-computed ArcFace vector."
+        )
         return False
 
     def remove_face_from_database(self, student_id: str) -> bool:
@@ -141,9 +151,13 @@ class FaceRecognizer:
             "matched": True,
         }
 
+    # DEPRECATED — raw images are not supported; use recognize_from_embedding() instead.
     def recognize_face(self, face_image: np.ndarray) -> Optional[Dict[str, Any]]:
-        """Legacy interface — not supported in ArcFace+FAISS mode."""
-        logger.warning("recognize_face() called with raw image — not supported.")
+        """Legacy interface — not supported in ArcFace+FAISS mode. Always returns None."""
+        logger.warning(
+            "recognize_face() called with raw image — "
+            "use recognize_from_embedding() with a pre-computed ArcFace vector."
+        )
         return None
 
     # ------------------------------------------------------------------
@@ -159,7 +173,9 @@ class FaceRecognizer:
         score = float(np.mean(scores))
         return score >= self.recognition_threshold, score
 
+    # DEPRECATED — raw images are not supported; use verify_from_embedding() instead.
     def verify_face(self, face_image: np.ndarray, student_id: str) -> Tuple[bool, float]:
+        """Legacy interface — not supported in ArcFace+FAISS mode. Always returns (False, 0.0)."""
         return False, 0.0
 
     # ------------------------------------------------------------------

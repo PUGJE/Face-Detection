@@ -1,23 +1,24 @@
 """
-Database Models for Attendance System
-
-This module defines the SQLAlchemy models for the attendance system.
+Database Models — SQLAlchemy ORM Definitions
 
 Models:
-- Student: Student information and face embeddings
-- Attendance: Attendance records
-- User: Admin/staff users
-
-Author: Face Recognition Team
-Date: January 2026
+  Student    — Student information and face-registration metadata
+  Attendance — Individual attendance records with recognition scores
+  User       — Admin / staff accounts (for future authentication)
 """
 
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Float, ForeignKey, Text
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
 from datetime import datetime
 
-Base = declarative_base()
+from sqlalchemy import (
+    Boolean, Column, DateTime, Float, ForeignKey,
+    Integer, String, Text,
+)
+from sqlalchemy.orm import DeclarativeBase, relationship
+
+
+class Base(DeclarativeBase):
+    """Base class for all ORM models (SQLAlchemy 2.x style)."""
+    pass
 
 
 class Student(Base):
