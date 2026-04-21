@@ -21,7 +21,7 @@ from contextlib import contextmanager
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 
-from backend.models.student import Base, Student, Attendance, User
+from backend.models.student import Base, Student, Attendance, User, Timetable
 from backend.config import settings
 
 logger = logging.getLogger(__name__)

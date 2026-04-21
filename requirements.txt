@@ -1,41 +1,100 @@
+# ============================================================
+# requirements.txt — pinned to exact versions in the venv
+# Generated from: pip freeze  (2026-04-22)
+# ============================================================
+
 # Core Web Framework
-fastapi>=0.109.0
-uvicorn[standard]>=0.27.0
-python-multipart>=0.0.6
-pydantic>=2.5.3
-pydantic-settings>=2.1.0
+fastapi==0.135.2
+uvicorn==0.42.0
+uvloop==0.22.1
+httptools==0.7.1
+starlette==1.0.0
+python-multipart==0.0.22
+pydantic==2.12.5
+pydantic-settings==2.13.1
+pydantic_core==2.41.5
+anyio==4.13.0
+h11==0.16.0
 
 # Database
-sqlalchemy>=2.0.25
-psycopg2-binary>=2.9.9
-supabase>=2.4.0
+SQLAlchemy==2.0.48
+greenlet==3.3.2
+psycopg2-binary==2.9.11
+aiosqlite==0.22.1
+
+# Supabase
+supabase==2.4.0          # keep at 2.4.x — newer versions change auth API
 
 # Authentication & Security
-python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
-python-dotenv>=1.0.0
+python-jose==3.5.0
+passlib==1.7.4
+bcrypt==5.0.0
+python-dotenv==1.2.2
+cryptography==46.0.6
+cffi==2.0.0
+pycparser==3.0
+rsa==4.9.1
+pyasn1==0.6.3
+ecdsa==0.19.2
 
 # Computer Vision & Image Processing
-opencv-python>=4.8.0
-opencv-contrib-python>=4.8.0
-Pillow>=10.2.0
+opencv-python==4.13.0.92
+opencv-contrib-python==4.13.0.92
+opencv-python-headless==4.13.0.92
+Pillow==12.1.1
 
 # Deep Learning & Face Recognition
-insightface>=0.7.3          # RetinaFace detection + ArcFace recognition (ONNX)
-onnxruntime>=1.16.0         # ONNX inference backend for InsightFace models
-faiss-cpu>=1.7.4            # FAISS vector index for fast embedding search
-scikit-image>=0.22.0        # LBP texture analysis (anti-spoofing)
-scipy>=1.12.0               # ndimage (anti-spoofing)
+insightface==0.7.3
+onnx==1.21.0
+onnxruntime==1.24.4
+faiss-cpu==1.13.2
+
+# Anti-spoofing helpers
+scikit-image==0.26.0
+lazy-loader==0.5
+tifffile==2026.3.3
+imageio==2.37.3
+scikit-learn==1.8.0
+scipy==1.17.1
+joblib==1.5.3
+threadpoolctl==3.6.0
 
 # Data Processing
-numpy>=1.26.0
-pandas>=2.1.4
+numpy==2.4.4
+pandas==3.0.1
+python-dateutil==2.9.0.post0
+six==1.17.0
 
-# Utilities
-python-dateutil>=2.8.2
-requests>=2.31.0
+# HTTP utilities
+requests==2.33.0
+httpx==0.28.1
+httpcore==1.0.9
+certifi==2026.2.25
+charset-normalizer==3.4.6
+idna==3.11
+urllib3==2.6.3
+
+# Server utilities
+watchfiles==1.1.1
+websockets==16.0
+click==8.3.1
+tqdm==4.67.3
+PyYAML==6.0.3
+
+# Type / annotation support
+annotated-types==0.7.0
+typing_extensions==4.15.0
+typing-inspection==0.4.2
 
 # Development & Testing
-pytest>=7.4.4
-pytest-asyncio>=0.23.3
-httpx>=0.26.0
+pytest==9.0.2
+pytest-asyncio==1.3.0
+
+# Misc transitive deps used by insightface / onnx
+easydict==1.13
+flatbuffers==25.12.19
+protobuf==7.34.1
+ml_dtypes==0.5.4
+absl-py==2.4.0
+simsimd==6.5.16
+stringzilla==4.6.0

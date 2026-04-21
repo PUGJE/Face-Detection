@@ -1,23 +1,15 @@
 "use client";
 
 /**
- * Students Page
- *
- * Manages student records and face registration.
- *
- * Features:
- *  - Create new student (form)
- *  - List all registered students
- *  - Open webcam and capture a face crop to register via ArcFace (browser-crop path)
+ * Students Page — manage students, register Face ID, delete records
+ * Unified dark glass UI matching the rest of the app.
  */
 
 import { useState, useEffect, useRef } from "react";
-import { UserPlus, Camera, UploadCloud, Loader2 } from "lucide-react";
+import { UserPlus, Camera, UploadCloud, Loader2, Trash2, RefreshCw, Lock, Eye, EyeOff } from "lucide-react";
 import { useMediaPipeDetector } from "@/hooks/useMediaPipeDetector";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD ?? "admin123";
 
 interface Student {
   student_id: string;
@@ -30,27 +22,37 @@ interface Student {
   is_active: boolean;
 }
 
-// ---------------------------------------------------------------------------
-// Page component
-// ---------------------------------------------------------------------------
-
 export default function StudentsPage() {
-  const [students, setStudents] = useState<Student[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Registration form state
+  const [students,  setStudents]  = useState<Student[]>([]);
+  const [loading,   setLoading]   = useState(true);
   const [studentId, setStudentId] = useState("");
-  const [name, setName] = useState("");
+  const [name,      setName]      = useState("");
   const [department, setDepartment] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [deleteTarget,   setDeleteTarget]   = useState<Student | null>(null);
+  const [deleting,       setDeleting]       = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deletePassErr,  setDeletePassErr]  = useState("");
+  const [showDelPass,    setShowDelPass]    = useState(false);
 
-  // Webcam state
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
-  const [capturingFor, setCapturingFor] = useState<string | null>(null); // student_id being registered
-  const [registering, setRegistering] = useState(false);
+  function openDeleteModal(s: Student) {
+    setDeleteTarget(s);
+    setDeletePassword("");
+    setDeletePassErr("");
+    setShowDelPass(false);
+  }
 
-  // Shared MediaPipe detector — loaded once on mount
+  function closeDeleteModal() {
+    setDeleteTarget(null);
+    setDeletePassword("");
+    setDeletePassErr("");
+  }
+
+  const videoRef     = useRef<HTMLVideoElement>(null);
+  const [stream,       setStream]       = useState<MediaStream | null>(null);
+  const [capturingFor, setCapturingFor] = useState<string | null>(null);
+  const [registering,  setRegistering]  = useState(false);
+
   const { detectorRef, detectorStatus } = useMediaPipeDetector();
 
   useEffect(() => {
@@ -59,14 +61,10 @@ export default function StudentsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ------------------------------------------------------------------
-  // Data fetching
-  // ------------------------------------------------------------------
-
   async function fetchStudents() {
     setLoading(true);
     try {
-      const res = await fetch("/api/students");
+      const res  = await fetch("/api/students");
       const data = await res.json();
       if (data.success) setStudents(data.data);
     } catch (err) {
@@ -76,20 +74,14 @@ export default function StudentsPage() {
     }
   }
 
-  // ------------------------------------------------------------------
-  // Student creation
-  // ------------------------------------------------------------------
-
   async function handleCreateStudent(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     try {
       const params = new URLSearchParams({ student_id: studentId, name, department });
-      const res = await fetch(`/api/students?${params}`, { method: "POST" });
+      const res    = await fetch(`/api/students?${params}`, { method: "POST" });
       if (res.ok) {
-        setStudentId("");
-        setName("");
-        setDepartment("");
+        setStudentId(""); setName(""); setDepartment("");
         await fetchStudents();
       } else {
         const data = await res.json();
@@ -102,20 +94,40 @@ export default function StudentsPage() {
     }
   }
 
-  // ------------------------------------------------------------------
-  // Webcam management
-  // ------------------------------------------------------------------
+  async function handleDelete() {
+    if (!deleteTarget) return;
+
+    // Verify admin password client-side before sending the request
+    if (deletePassword !== ADMIN_PASSWORD) {
+      setDeletePassErr("Incorrect password");
+      setDeletePassword("");
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/students/${deleteTarget.student_id}`, { method: "DELETE" });
+      if (res.ok) {
+        closeDeleteModal();
+        await fetchStudents();
+      } else {
+        const data = await res.json();
+        alert(`Delete failed: ${data.detail}`);
+      }
+    } catch {
+      alert("Network error while deleting student.");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function startWebcam(id: string) {
     setCapturingFor(id);
     try {
       const ms = await navigator.mediaDevices.getUserMedia({ video: true });
       setStream(ms);
-      if (videoRef.current) {
-        videoRef.current.srcObject = ms;
-      }
-    } catch (err) {
-      console.error("Webcam access denied:", err);
+      if (videoRef.current) videoRef.current.srcObject = ms;
+    } catch {
       alert("Could not access camera. Please allow camera permission.");
     }
   }
@@ -126,72 +138,50 @@ export default function StudentsPage() {
     setCapturingFor(null);
   }
 
-  // ------------------------------------------------------------------
-  // Face capture and registration
-  // ------------------------------------------------------------------
-
   async function captureAndRegister() {
     if (!videoRef.current || !capturingFor) return;
-
     if (detectorStatus !== "ready" || !detectorRef.current) {
       alert("Face detector is still loading. Please wait.");
       return;
     }
 
     setRegistering(true);
-
-    // Snapshot the current video frame
     const canvas = document.createElement("canvas");
-    canvas.width = videoRef.current.videoWidth || 640;
+    canvas.width  = videoRef.current.videoWidth  || 640;
     canvas.height = videoRef.current.videoHeight || 480;
     const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      setRegistering(false);
-      return;
-    }
+    if (!ctx) { setRegistering(false); return; }
     ctx.drawImage(videoRef.current, 0, 0);
 
     try {
-      // 1. Client-side face detection (browser, no server round-trip)
       const { detections } = detectorRef.current.detect(canvas);
       if (!detections?.length) {
         alert("No clear face detected! Please look straight into the camera.");
         return;
       }
-
       const face = detections[0].boundingBox;
-      if (!face) {
-        alert("Could not extract face bounds.");
-        return;
-      }
+      if (!face) { alert("Could not extract face bounds."); return; }
 
-      // 2. Crop with 25% padding so ArcFace gets enough facial context
-      const padX = face.width * 0.25;
+      const padX = face.width  * 0.25;
       const padY = face.height * 0.25;
-      const sx = Math.max(0, face.originX - padX);
-      const sy = Math.max(0, face.originY - padY);
-      const sw = Math.min(canvas.width - sx, face.width + 2 * padX);
-      const sh = Math.min(canvas.height - sy, face.height + 2 * padY);
+      const sx   = Math.max(0, face.originX - padX);
+      const sy   = Math.max(0, face.originY - padY);
+      const sw   = Math.min(canvas.width  - sx, face.width  + 2 * padX);
+      const sh   = Math.min(canvas.height - sy, face.height + 2 * padY);
 
-      const cropCanvas = document.createElement("canvas");
-      cropCanvas.width = sw;
-      cropCanvas.height = sh;
-      cropCanvas.getContext("2d")?.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+      const crop = document.createElement("canvas");
+      crop.width  = sw; crop.height = sh;
+      crop.getContext("2d")?.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
 
-      // 3. Send the cropped face to the server — ArcFace only (~5 ms)
-      cropCanvas.toBlob(async (blob) => {
-        if (!blob) {
-          setRegistering(false);
-          return;
-        }
+      crop.toBlob(async (blob) => {
+        if (!blob) { setRegistering(false); return; }
         const form = new FormData();
         form.append("file", blob, "crop.jpg");
 
         try {
-          const res = await fetch(
-            `/api/students/${capturingFor}/register-face-crop`,
-            { method: "POST", body: form }
-          );
+          const res = await fetch(`/api/students/${capturingFor}/register-face-crop`, {
+            method: "POST", body: form,
+          });
           if (res.ok) {
             alert("Face registered successfully!");
             stopWebcam();
@@ -200,103 +190,154 @@ export default function StudentsPage() {
             const data = await res.json();
             alert(`Error: ${data.detail}`);
           }
-        } catch (err) {
-          console.error("Registration request failed:", err);
+        } catch {
           alert("Network error while registering face.");
         } finally {
           setRegistering(false);
         }
       }, "image/jpeg", 0.9);
-    } catch (err) {
-      console.error("Error processing image:", err);
+    } catch {
       alert("Error processing the image.");
       setRegistering(false);
     }
   }
 
-  // ------------------------------------------------------------------
-  // Render
-  // ------------------------------------------------------------------
-
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-white">Students</h1>
-          <p className="text-slate-400">Manage students and register Face ID models</p>
+          <p className="text-slate-400 mt-1">Manage students and register Face ID</p>
         </div>
+        <button
+          onClick={fetchStudents}
+          className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 text-sm font-medium transition"
+        >
+          <RefreshCw className="w-4 h-4" /> Refresh
+        </button>
       </div>
 
+      {/* Delete confirmation modal — password protected */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass-panel border border-slate-700 rounded-2xl p-8 max-w-sm w-full shadow-2xl">
+            <Trash2 className="w-12 h-12 text-red-400 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-white text-center mb-1">Delete Student?</h3>
+            <p className="text-slate-400 text-sm text-center mb-5">
+              <span className="text-white font-medium">{deleteTarget.name}</span> ({deleteTarget.student_id})<br />
+              This will soft-delete the record. Face data will be removed.
+            </p>
+
+            {/* Password gate */}
+            <div className="mb-5">
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                <Lock className="w-3.5 h-3.5" /> Admin Password Required
+              </label>
+              <div className="relative">
+                <input
+                  id="delete-password-input"
+                  autoFocus
+                  type={showDelPass ? "text" : "password"}
+                  value={deletePassword}
+                  onChange={(e) => { setDeletePassword(e.target.value); setDeletePassErr(""); }}
+                  onKeyDown={(e) => e.key === "Enter" && handleDelete()}
+                  placeholder="Enter admin password"
+                  className={`w-full px-4 py-2.5 pr-10 bg-slate-800/60 border rounded-xl text-white
+                    placeholder-slate-500 focus:outline-none focus:ring-2 transition text-sm
+                    ${deletePassErr
+                      ? "border-red-500/50 focus:ring-red-500/30"
+                      : "border-slate-700 focus:ring-red-500/30"
+                    }`}
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowDelPass(!showDelPass)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition"
+                >
+                  {showDelPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              {deletePassErr && (
+                <p className="text-red-400 text-xs font-medium mt-1.5">{deletePassErr}</p>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={closeDeleteModal}
+                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting || !deletePassword}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold transition flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* ── Registration form ─────────────────────────────────────── */}
-        <div className="glass-panel rounded-2xl p-6 h-fit border-purple-500/30 border-2">
-          <div className="flex items-center space-x-3 mb-6">
+        {/* Registration form */}
+        <div className="glass-panel rounded-2xl p-6 h-fit border border-purple-500/30">
+          <div className="flex items-center gap-3 mb-6">
             <UserPlus className="text-purple-400 w-6 h-6" />
             <h2 className="text-xl font-bold text-white">Add New Student</h2>
           </div>
 
           <form onSubmit={handleCreateStudent} className="space-y-4">
-            <div>
-              <label className="text-slate-400 text-sm">Student ID</label>
-              <input
-                required
-                value={studentId}
-                onChange={(e) => setStudentId(e.target.value)}
-                type="text"
-                className="w-full bg-slate-800/50 mt-1 border border-slate-700 rounded-lg px-4 py-2 text-white outline-none focus:border-purple-500"
-                placeholder="e.g. CS-2026-001"
-              />
-            </div>
-            <div>
-              <label className="text-slate-400 text-sm">Full Name</label>
-              <input
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                type="text"
-                className="w-full bg-slate-800/50 mt-1 border border-slate-700 rounded-lg px-4 py-2 text-white outline-none focus:border-purple-500"
-                placeholder="John Doe"
-              />
-            </div>
-            <div>
-              <label className="text-slate-400 text-sm">Department</label>
-              <input
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-                type="text"
-                className="w-full bg-slate-800/50 mt-1 border border-slate-700 rounded-lg px-4 py-2 text-white outline-none focus:border-purple-500"
-                placeholder="Computer Science"
-              />
-            </div>
+            {[
+              { label: "Student ID", value: studentId, setter: setStudentId, placeholder: "CS-2026-001", required: true },
+              { label: "Full Name",  value: name,      setter: setName,      placeholder: "John Doe",      required: true },
+              { label: "Department", value: department, setter: setDepartment, placeholder: "Computer Science", required: false },
+            ].map(({ label, value, setter, placeholder, required }) => (
+              <div key={label}>
+                <label className="text-slate-400 text-sm block mb-1">{label}</label>
+                <input
+                  required={required}
+                  value={value}
+                  onChange={(e) => setter(e.target.value)}
+                  placeholder={placeholder}
+                  className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30 transition"
+                />
+              </div>
+            ))}
             <button
               disabled={submitting}
               type="submit"
-              className="w-full mt-4 bg-purple-600 hover:bg-purple-700 transition-colors text-white font-bold py-2 rounded-lg flex justify-center"
+              className="w-full mt-4 bg-purple-600 hover:bg-purple-700 transition text-white font-bold py-2.5 rounded-lg flex justify-center items-center gap-2"
             >
-              {submitting ? <Loader2 className="animate-spin w-5 h-5" /> : "Create Student"}
+              {submitting ? <Loader2 className="animate-spin w-5 h-5" /> : <UserPlus className="w-5 h-5" />}
+              Create Student
             </button>
           </form>
         </div>
 
-        {/* ── Student list & face registration ─────────────────────── */}
+        {/* Student list */}
         <div className="lg:col-span-2 glass-panel rounded-2xl p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold text-white">Registered Database</h2>
             {detectorStatus === "loading" && (
-              <span className="flex items-center gap-2 text-sm text-amber-400 bg-amber-400/10 px-3 py-1.5 rounded-full">
+              <span className="flex items-center gap-2 text-sm text-amber-400 bg-amber-400/10 px-3 py-1.5 rounded-full border border-amber-400/20">
                 <Loader2 className="w-4 h-4 animate-spin" /> Loading ML Engine…
               </span>
             )}
           </div>
 
-          {/* Webcam panel — shown when a student is being registered */}
+          {/* Webcam panel */}
           {capturingFor && (
-            <div className="mb-6 p-4 rounded-xl bg-slate-900/50 border border-slate-800">
+            <div className="mb-6 p-4 rounded-xl bg-slate-900/50 border border-slate-700">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-emerald-400 font-bold flex items-center gap-2">
                   <Camera className="w-5 h-5" /> Registering: {capturingFor}
                 </h3>
-                <button onClick={stopWebcam} className="text-slate-400 hover:text-white">
+                <button onClick={stopWebcam} className="text-slate-400 hover:text-white transition text-sm">
                   Cancel
                 </button>
               </div>
@@ -306,67 +347,67 @@ export default function StudentsPage() {
               <button
                 disabled={registering || detectorStatus !== "ready"}
                 onClick={captureAndRegister}
-                className="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 transition text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 transition text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {registering ? <Loader2 className="animate-spin" /> : <UploadCloud />}
-                Capture &amp; Register
+                Capture & Register
               </button>
             </div>
           )}
 
-          {/* Student table */}
-          <div className="overflow-x-auto">
+          {/* Table */}
+          <div className="overflow-x-auto rounded-xl border border-slate-700/50">
             <table className="w-full text-left text-slate-300">
-              <thead className="bg-slate-800/50 text-slate-400 uppercase text-xs">
+              <thead className="bg-slate-800/60 text-slate-400 text-xs uppercase">
                 <tr>
-                  <th className="px-4 py-3 rounded-tl-lg">ID</th>
+                  <th className="px-4 py-3">ID</th>
                   <th className="px-4 py-3">Name</th>
                   <th className="px-4 py-3">Dept</th>
                   <th className="px-4 py-3">Face ID</th>
-                  <th className="px-4 py-3 rounded-tr-lg">Action</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-700/40">
                 {loading ? (
-                  <tr>
-                    <td colSpan={5} className="text-center py-8">
-                      <Loader2 className="animate-spin mx-auto w-6 h-6 text-slate-500" />
-                    </td>
-                  </tr>
+                  <tr><td colSpan={5} className="text-center py-10">
+                    <Loader2 className="animate-spin mx-auto w-6 h-6 text-slate-500" />
+                  </td></tr>
                 ) : students.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="text-center py-8 text-slate-500">
-                      No students found.
-                    </td>
-                  </tr>
+                  <tr><td colSpan={5} className="text-center py-10 text-slate-500">No students found.</td></tr>
                 ) : (
                   students.map((s) => (
-                    <tr
-                      key={s.student_id}
-                      className="border-b border-slate-700/50 hover:bg-slate-800/30"
-                    >
-                      <td className="px-4 py-3 font-medium text-white">{s.student_id}</td>
-                      <td className="px-4 py-3">{s.name}</td>
-                      <td className="px-4 py-3">{s.department ?? "—"}</td>
+                    <tr key={s.student_id} className="hover:bg-slate-800/30 transition-colors group">
+                      <td className="px-4 py-3 font-mono text-white font-medium text-sm">{s.student_id}</td>
+                      <td className="px-4 py-3 font-medium">{s.name}</td>
+                      <td className="px-4 py-3 text-slate-400">{s.department ?? "—"}</td>
                       <td className="px-4 py-3">
                         {s.face_registered ? (
-                          <span className="text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded text-xs font-bold">
-                            Registered
+                          <span className="text-emerald-400 bg-emerald-400/10 px-2.5 py-1 rounded-full text-xs font-bold border border-emerald-400/20">
+                            ✓ Registered
                           </span>
                         ) : (
-                          <span className="text-rose-400 bg-rose-400/10 px-2 py-1 rounded text-xs font-bold">
+                          <span className="text-rose-400 bg-rose-400/10 px-2.5 py-1 rounded-full text-xs font-bold border border-rose-400/20">
                             Pending
                           </span>
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <button
-                          onClick={() => startWebcam(s.student_id)}
-                          disabled={detectorStatus !== "ready"}
-                          className="text-blue-400 hover:text-blue-300 text-sm font-medium disabled:opacity-50"
-                        >
-                          Add Face
-                        </button>
+                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => startWebcam(s.student_id)}
+                            disabled={detectorStatus !== "ready"}
+                            className="px-3 py-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 text-xs font-semibold border border-blue-500/20 transition disabled:opacity-40"
+                          >
+                            Add Face
+                          </button>
+                          <button
+                            onClick={() => openDeleteModal(s)}
+                            className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition"
+                            title="Delete student"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))

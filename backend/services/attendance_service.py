@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from backend.config import settings
 from backend.database.connection import db_manager
-from backend.models.student import Attendance, Student
+from backend.models.student import Attendance, Student, Timetable
 
 logger = logging.getLogger(__name__)
 
@@ -97,14 +97,33 @@ class AttendanceService:
             now = datetime.now()
             today_str = now.strftime("%Y-%m-%d")
             time_str = now.strftime("%H:%M:%S")
+            day_name = now.strftime("%A")
 
             # Duplicate check: one record per student per day
+            # (Note for Timetable support: if one student can attend multiple classes,
+            # this check should probably include the timetable_id. For now, we update to check per timetable_id)
+            current_time = now.time()
+            active_timetable = (
+                self.session.query(Timetable)
+                .filter(
+                    and_(
+                        Timetable.day_of_week == day_name,
+                        Timetable.start_time <= current_time,
+                        Timetable.end_time >= current_time
+                    )
+                )
+                .first()
+            )
+            
+            timetable_id = active_timetable.id if active_timetable else None
+
             existing = (
                 self.session.query(Attendance)
                 .filter(
                     and_(
                         Attendance.student_id == student.id,
                         Attendance.date == today_str,
+                        Attendance.timetable_id == timetable_id if timetable_id else True
                     )
                 )
                 .first()
@@ -113,16 +132,25 @@ class AttendanceService:
                 return {
                     "success": False,
                     "duplicate": True,
-                    "error": "Attendance already marked today.",
+                    "error": "Attendance already marked for this active class slot.",
                     "student_id": student_id,
                     "student_name": student.name,
                     "existing_record": existing.to_dict(),
                 }
 
-            status = "late" if _is_late(now) else "present"
+            # Status determination
+            if active_timetable:
+                # Late if arrived more than 15 mins after class start
+                late_threshold = (
+                    datetime.combine(date.min, active_timetable.start_time) + timedelta(minutes=15)
+                ).time()
+                status = "late" if current_time > late_threshold else "present"
+            else:
+                status = "late" if _is_late(now) else "present"
 
             record = Attendance(
                 student_id=student.id,
+                timetable_id=timetable_id,
                 timestamp=now,
                 date=today_str,
                 time=time_str,
@@ -136,7 +164,7 @@ class AttendanceService:
             self.session.add(record)
             self.session.commit()
 
-            logger.info(f"Attendance marked — {student_id} ({student.name}) [{status}]")
+            logger.info(f"Attendance marked — {student_id} ({student.name}) [{status}] Timetable: {timetable_id}")
 
             return {
                 "success": True,
@@ -147,6 +175,7 @@ class AttendanceService:
                 "status": status,
                 "recognition_confidence": recognition_confidence,
                 "attendance_id": record.id,
+                "timetable_id": timetable_id
             }
 
         except Exception as e:
@@ -317,6 +346,101 @@ class AttendanceService:
                 (today_records / total_students * 100), 1
             ) if total_students else 0.0,
         }
+
+    def get_student_subject_matrix(self) -> Dict[str, Any]:
+        """
+        Return a 2-D attendance matrix: students × timetable subjects.
+
+        Structure:
+            {
+              "subjects": [
+                {"id": 1, "subject_name": "Deep Learning", "day_of_week": "Monday",
+                 "start_time": "09:00", "end_time": "10:00"}
+              ],
+              "students": [
+                {
+                  "student_id": "S001",
+                  "student_name": "Alice",
+                  "attendance": {1: 3, 2: 0, ...}   # timetable_id -> count
+                }
+              ]
+            }
+        """
+        timetables = self.session.query(Timetable).order_by(Timetable.day_of_week, Timetable.start_time).all()
+        students = self.session.query(Student).filter(Student.is_active.is_(True)).order_by(Student.name).all()
+
+        subjects_out = []
+        for t in timetables:
+            subjects_out.append({
+                "id": t.id,
+                "subject_name": t.subject_name,
+                "day_of_week": t.day_of_week,
+                "start_time": t.start_time.strftime("%H:%M") if t.start_time else None,
+                "end_time": t.end_time.strftime("%H:%M") if t.end_time else None,
+            })
+
+        students_out = []
+        for s in students:
+            row: Dict[int, int] = {t.id: 0 for t in timetables}
+            records = (
+                self.session.query(Attendance.timetable_id, func.count(Attendance.id))
+                .filter(Attendance.student_id == s.id)
+                .group_by(Attendance.timetable_id)
+                .all()
+            )
+            for timetable_id, cnt in records:
+                if timetable_id in row:
+                    row[timetable_id] = cnt
+            students_out.append({
+                "student_id": s.student_id,
+                "student_name": s.name,
+                "attendance": row,
+            })
+
+        return {"subjects": subjects_out, "students": students_out}
+
+    def get_timetable_summary_statistics(self) -> List[Dict[str, Any]]:
+        """
+        Return attendance statistics grouped by Timetable subjects.
+        """
+        timetables = self.session.query(Timetable).all()
+        stats = []
+        for t in timetables:
+            total_students = self.session.query(Student).filter(Student.is_active.is_(True)).count()
+            
+            present = (
+                self.session.query(Attendance)
+                .filter(
+                    and_(
+                        Attendance.timetable_id == t.id,
+                        Attendance.status == "present"
+                    )
+                )
+                .count()
+            )
+            late = (
+                self.session.query(Attendance)
+                .filter(
+                    and_(
+                        Attendance.timetable_id == t.id,
+                        Attendance.status == "late"
+                    )
+                )
+                .count()
+            )
+            total = present + late
+            stats.append({
+                "timetable_id": t.id,
+                "subject_name": t.subject_name,
+                "day_of_week": t.day_of_week,
+                "start_time": t.start_time.strftime('%H:%M:%S'),
+                "end_time": t.end_time.strftime('%H:%M:%S'),
+                "total_records": total,
+                "present_count": present,
+                "late_count": late,
+            })
+            
+        return stats
 
 
 # ---------------------------------------------------------------------------

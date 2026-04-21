@@ -1,21 +1,23 @@
 "use client";
 
 /**
- * Attendance Page — Live Face Scanning
+ * Attendance Page — Live Face Scanning with Blink Verification
  *
- * Opens the webcam and scans for faces every 3 seconds.
- * Detected face crops are sent to the backend (ArcFace only — browser-crop path)
- * for fast, low-latency recognition (~5 ms server side).
+ * Opens the webcam, monitors eye landmarks for a blink, and only sends
+ * the face crop to the backend once a genuine blink is confirmed.
  *
  * Features:
+ *  - Active class banner (polls /api/timetable/active every 60 s)
+ *  - Blink gate: attendance is blocked unless a blink is detected
  *  - Continuous scanning at configurable intervals
  *  - Today's attendance log panel (auto-refreshes every 10 s while active)
  *  - Duplicate attendance detection surfaced to the user
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Camera, ScanFace, CheckSquare, Loader2, RefreshCw } from "lucide-react";
+import { Camera, ScanFace, CheckSquare, Loader2, RefreshCw, Eye, EyeOff, Clock } from "lucide-react";
 import { useMediaPipeDetector } from "@/hooks/useMediaPipeDetector";
+import { useBlinkDetector } from "@/hooks/useBlinkDetector";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -31,21 +33,29 @@ interface LogEntry {
   time: string;
   status: AttendanceStatus;
   recognition_confidence?: number;
+  subject_name?: string;
+}
+
+interface ActiveClass {
+  subject_name: string;
+  day_of_week: string;
+  start_time: string;
+  end_time: string;
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-const SCAN_INTERVAL_MS = 3000;
-const LOG_POLL_INTERVAL_MS = 10000;
+const SCAN_INTERVAL_MS      = 3000;
+const LOG_POLL_INTERVAL_MS  = 10000;
+const CLASS_POLL_INTERVAL_MS = 60000;
 
-/** Return a Tailwind class string for the attendance status badge. */
 function statusBadgeClass(status: AttendanceStatus): string {
   const map: Record<AttendanceStatus, string> = {
     present: "bg-emerald-500/10 text-emerald-400",
-    late: "bg-amber-500/10 text-amber-400",
-    absent: "bg-rose-500/10 text-rose-400",
+    late:    "bg-amber-500/10 text-amber-400",
+    absent:  "bg-rose-500/10 text-rose-400",
   };
   return map[status] ?? "bg-slate-500/10 text-slate-400";
 }
@@ -55,31 +65,52 @@ function statusBadgeClass(status: AttendanceStatus): string {
 // ---------------------------------------------------------------------------
 
 export default function AttendancePage() {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const videoRef     = useRef<HTMLVideoElement>(null);
+  const streamRef    = useRef<MediaStream | null>(null);
   const scanTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // Track active state via a ref so the async captureAndScan callback always
-  // reads the current value without needing to be in the dependency array.
-  const isActiveRef = useRef(false);
+  const classTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isActiveRef  = useRef(false);
 
-  const [isActive, setIsActive] = useState(false);
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [scanning, setScanning] = useState(false);
-  const [webcamError, setWebcamError] = useState<string | null>(null);
+  const [isActive,      setIsActive]      = useState(false);
+  const [logs,          setLogs]          = useState<LogEntry[]>([]);
+  const [scanning,      setScanning]      = useState(false);
+  const [webcamError,   setWebcamError]   = useState<string | null>(null);
   const [lastScanResult, setLastScanResult] = useState<string | null>(null);
+  const [activeClass,   setActiveClass]   = useState<ActiveClass | null>(null);
+  const [classLoading,  setClassLoading]  = useState(true);
+  const [blinkFlash,    setBlinkFlash]    = useState(false);
 
-  // Shared MediaPipe detector — loaded once on mount
+  // Shared MediaPipe face detector (BlazeFace) — loaded once on mount
   const { detectorRef, detectorStatus } = useMediaPipeDetector();
+
+  // Blink detector (Face Landmarker) — loaded once on mount
+  const { blinkDetected, resetBlink, startBlink, stopBlink, landmarkerStatus, currentEar } = useBlinkDetector();
+
+  // Mirror blinkDetected into a ref so captureAndScan (inside setInterval)
+  // always reads the live value without stale-closure issues.
+  const blinkRef = useRef(false);
+  useEffect(() => { blinkRef.current = blinkDetected; }, [blinkDetected]);
 
   useEffect(() => {
     fetchTodayLogs();
+    fetchActiveClass();
     return () => {
       stopWebcam();
-      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+      if (pollTimerRef.current)  clearInterval(pollTimerRef.current);
+      if (classTimerRef.current) clearInterval(classTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Flash the blink indicator whenever blinkDetected flips true
+  useEffect(() => {
+    if (blinkDetected) {
+      setBlinkFlash(true);
+      const t = setTimeout(() => setBlinkFlash(false), 700);
+      return () => clearTimeout(t);
+    }
+  }, [blinkDetected]);
 
   // ------------------------------------------------------------------
   // Data fetching
@@ -95,69 +126,72 @@ export default function AttendancePage() {
     }
   }
 
+  async function fetchActiveClass() {
+    setClassLoading(true);
+    try {
+      const res = await fetch("/api/timetable/active");
+      const data = await res.json();
+      setActiveClass(data.active ? data.data : null);
+    } catch {
+      setActiveClass(null);
+    } finally {
+      setClassLoading(false);
+    }
+  }
+
+
   // ------------------------------------------------------------------
   // Scanning
   // ------------------------------------------------------------------
 
   const captureAndScan = useCallback(async () => {
-    // Guard: only scan when active and video is ready
     if (!isActiveRef.current || !videoRef.current || !detectorRef.current) return;
-    if (videoRef.current.readyState < 2 /* HTMLVideoElement.HAVE_CURRENT_DATA */) return;
+    if (videoRef.current.readyState < 2) return;
+
+    // 🔒 Blink gate — read from ref (never stale inside setInterval closure)
+    if (!blinkRef.current) return;
+    // Consume the blink immediately so only one scan fires per blink
+    blinkRef.current = false;
+    resetBlink();
 
     setScanning(true);
 
     const canvas = document.createElement("canvas");
-    canvas.width = videoRef.current.videoWidth || 640;
+    canvas.width  = videoRef.current.videoWidth  || 640;
     canvas.height = videoRef.current.videoHeight || 480;
     const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      setScanning(false);
-      return;
-    }
+    if (!ctx) { setScanning(false); return; }
     ctx.drawImage(videoRef.current, 0, 0);
 
     try {
       // 1. Client-side face detection
       const { detections } = detectorRef.current.detect(canvas);
-      if (!detections?.length) {
-        setScanning(false);
-        return;
-      }
+      if (!detections?.length) { setScanning(false); return; }
 
       const face = detections[0].boundingBox;
-      if (!face) {
-        setScanning(false);
-        return;
-      }
+      if (!face) { setScanning(false); return; }
 
-      // 2. Crop face with 25% padding for better ArcFace accuracy
-      const padX = face.width * 0.25;
+      // 2. Crop face with 25% padding
+      const padX = face.width  * 0.25;
       const padY = face.height * 0.25;
-      const sx = Math.max(0, face.originX - padX);
-      const sy = Math.max(0, face.originY - padY);
-      const sw = Math.min(canvas.width - sx, face.width + 2 * padX);
-      const sh = Math.min(canvas.height - sy, face.height + 2 * padY);
+      const sx   = Math.max(0, face.originX - padX);
+      const sy   = Math.max(0, face.originY - padY);
+      const sw   = Math.min(canvas.width  - sx, face.width  + 2 * padX);
+      const sh   = Math.min(canvas.height - sy, face.height + 2 * padY);
 
       const cropCanvas = document.createElement("canvas");
-      cropCanvas.width = sw;
+      cropCanvas.width  = sw;
       cropCanvas.height = sh;
       cropCanvas.getContext("2d")?.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
 
-      // 3. Send crop to the server — ArcFace only (~5 ms latency)
       cropCanvas.toBlob(async (blob) => {
-        if (!blob) {
-          setScanning(false);
-          return;
-        }
+        if (!blob) { setScanning(false); return; }
 
         const form = new FormData();
         form.append("file", blob, "crop.jpg");
 
         try {
-          const res = await fetch("/api/attendance/mark-crop", {
-            method: "POST",
-            body: form,
-          });
+          const res  = await fetch("/api/attendance/mark-crop", { method: "POST", body: form });
           const data = await res.json();
 
           if (data.success) {
@@ -166,14 +200,11 @@ export default function AttendancePage() {
             void fetchTodayLogs();
             setTimeout(() => setLastScanResult(null), 4000);
           } else if (data.duplicate) {
-            setLastScanResult("ℹ️ Already marked today");
+            setLastScanResult("ℹ️ Already marked for this class");
             setTimeout(() => setLastScanResult(null), 2000);
           }
-          // No-match results (face not recognised) are silently ignored
-          // to avoid flooding the UI during continuous scanning.
         } catch (err) {
-          // Network errors during rapid scans are logged but not surfaced
-          console.warn("Scan request failed (ignored during continuous scanning):", err);
+          console.warn("Scan request failed:", err);
         } finally {
           setScanning(false);
         }
@@ -182,7 +213,7 @@ export default function AttendancePage() {
       console.error("Error during face scan:", err);
       setScanning(false);
     }
-  }, [detectorRef]); // detectorRef is stable across renders
+  }, [detectorRef, resetBlink]); // blinkDetected read via blinkRef — no dep needed
 
   // ------------------------------------------------------------------
   // Webcam management
@@ -191,9 +222,7 @@ export default function AttendancePage() {
   async function startWebcam() {
     setWebcamError(null);
     try {
-      const ms = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" },
-      });
+      const ms = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
       streamRef.current = ms;
 
       if (videoRef.current) {
@@ -204,8 +233,12 @@ export default function AttendancePage() {
       isActiveRef.current = true;
       setIsActive(true);
 
-      scanTimerRef.current = setInterval(captureAndScan, SCAN_INTERVAL_MS);
-      pollTimerRef.current = setInterval(fetchTodayLogs, LOG_POLL_INTERVAL_MS);
+      // Start internal rAF-based blink loop
+      if (videoRef.current) startBlink(videoRef.current);
+
+      scanTimerRef.current  = setInterval(captureAndScan, SCAN_INTERVAL_MS);
+      pollTimerRef.current  = setInterval(fetchTodayLogs, LOG_POLL_INTERVAL_MS);
+      classTimerRef.current = setInterval(fetchActiveClass, CLASS_POLL_INTERVAL_MS);
     } catch (err: any) {
       setWebcamError(err?.message ?? "Camera permission denied or unavailable.");
     }
@@ -213,24 +246,26 @@ export default function AttendancePage() {
 
   function stopWebcam() {
     isActiveRef.current = false;
+    stopBlink(); // stop internal rAF loop
 
-    if (scanTimerRef.current) {
-      clearInterval(scanTimerRef.current);
-      scanTimerRef.current = null;
-    }
-    if (pollTimerRef.current) {
-      clearInterval(pollTimerRef.current);
-      pollTimerRef.current = null;
-    }
+    [scanTimerRef, pollTimerRef, classTimerRef].forEach((r) => {
+      if (r.current) { clearInterval(r.current); r.current = null; }
+    });
 
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
-
     if (videoRef.current) videoRef.current.srcObject = null;
 
     setIsActive(false);
     setScanning(false);
   }
+
+  // ------------------------------------------------------------------
+  // Derived booleans
+  // ------------------------------------------------------------------
+
+  const enginesReady  = detectorStatus === "ready" && landmarkerStatus === "ready";
+  const enginesLoading = detectorStatus === "loading" || landmarkerStatus === "loading";
 
   // ------------------------------------------------------------------
   // Render
@@ -241,9 +276,36 @@ export default function AttendancePage() {
       <div>
         <h1 className="text-3xl font-bold text-white">Live Attendance</h1>
         <p className="text-slate-400">
-          Continuous face tracking and recognition — scans every {SCAN_INTERVAL_MS / 1000} seconds
+          Blink-verified face recognition — scans every {SCAN_INTERVAL_MS / 1000} seconds
         </p>
       </div>
+
+      {/* ── Active class banner ─────────────────────────────────────── */}
+      {classLoading ? (
+        <div className="glass-panel rounded-xl px-5 py-3 flex items-center gap-3 text-slate-400 text-sm">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Checking class schedule…
+        </div>
+      ) : activeClass ? (
+        <div className="glass-panel rounded-xl px-5 py-3 flex items-center gap-4 border border-emerald-500/30 bg-emerald-500/5">
+          <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+          <div className="flex-1">
+            <span className="font-semibold text-emerald-300">{activeClass.subject_name}</span>
+            <span className="text-slate-400 text-sm ml-3">
+              {activeClass.day_of_week} · {activeClass.start_time} – {activeClass.end_time}
+            </span>
+          </div>
+          <span className="text-xs text-emerald-500 font-bold uppercase tracking-wider">
+            Class In Session
+          </span>
+        </div>
+      ) : (
+        <div className="glass-panel rounded-xl px-5 py-3 flex items-center gap-4 border border-amber-500/20 bg-amber-500/5">
+          <Clock className="w-4 h-4 text-amber-400" />
+          <span className="text-amber-300 text-sm font-medium">No class is currently active.</span>
+          <span className="text-amber-600 text-xs ml-auto">Attendance is still allowed</span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* ── Camera feed ───────────────────────────────────────────── */}
@@ -252,6 +314,24 @@ export default function AttendancePage() {
             <div className="flex items-center gap-3">
               <ScanFace className="w-6 h-6 text-blue-400" />
               <h2 className="text-xl font-bold text-white">Scanner Feed</h2>
+            </div>
+
+            {/* Engine status pills */}
+            <div className="flex items-center gap-2">
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
+                detectorStatus === "ready"
+                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                  : "bg-slate-500/10 text-slate-400 border-slate-500/20"
+              }`}>
+                Face
+              </span>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
+                landmarkerStatus === "ready"
+                  ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                  : "bg-slate-500/10 text-slate-400 border-slate-500/20"
+              }`}>
+                Blink
+              </span>
             </div>
 
             {isActive ? (
@@ -266,11 +346,11 @@ export default function AttendancePage() {
               <button
                 id="btn-start-camera"
                 onClick={startWebcam}
-                disabled={detectorStatus !== "ready"}
+                disabled={!enginesReady}
                 className="bg-emerald-500/20 text-emerald-400 px-4 py-2 rounded-lg font-medium hover:bg-emerald-500/30 transition flex items-center gap-2 disabled:opacity-50"
               >
                 <Camera className="w-5 h-5" />
-                {detectorStatus === "loading" ? "Loading Engine…" : "Start Camera"}
+                {enginesLoading ? "Loading Engines…" : "Start Camera"}
               </button>
             )}
           </div>
@@ -289,6 +369,25 @@ export default function AttendancePage() {
             </div>
           )}
 
+          {/* Blink prompt */}
+          {isActive && !blinkDetected && (
+            <div className="mb-4 p-3 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-300 text-sm flex items-center gap-2">
+              <Eye className="w-4 h-4" />
+              <span>Blink to verify liveness and mark attendance</span>
+              {currentEar !== null && (
+                <span className="ml-auto text-purple-500 text-xs font-mono">EAR {currentEar}</span>
+              )}
+            </div>
+          )}
+
+          {/* Blink confirmed flash */}
+          {isActive && blinkDetected && (
+            <div className="mb-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm flex items-center gap-2 animate-pulse">
+              <EyeOff className="w-4 h-4" />
+              <span>Blink detected! Scanning face…</span>
+            </div>
+          )}
+
           {/* Video element */}
           <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden shadow-2xl border border-slate-700">
             <video
@@ -301,10 +400,11 @@ export default function AttendancePage() {
 
             {!isActive && (
               <div className="absolute inset-0 flex items-center justify-center flex-col text-slate-500">
-                {detectorStatus === "loading" ? (
+                {enginesLoading ? (
                   <>
                     <Loader2 className="w-16 h-16 mb-4 opacity-50 animate-spin" />
-                    <p className="font-medium">Warming up ML engine…</p>
+                    <p className="font-medium">Warming up ML engines…</p>
+                    <p className="text-xs mt-1 text-slate-600">Face + Blink models loading</p>
                   </>
                 ) : (
                   <>
@@ -318,7 +418,7 @@ export default function AttendancePage() {
               </div>
             )}
 
-            {/* Scanning indicator overlay */}
+            {/* Scanning indicator */}
             {isActive && scanning && (
               <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2">
                 <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
@@ -328,8 +428,13 @@ export default function AttendancePage() {
               </div>
             )}
 
+            {/* Blink flash overlay */}
+            {blinkFlash && (
+              <div className="absolute inset-0 border-4 border-purple-500/60 pointer-events-none rounded-xl animate-pulse" />
+            )}
+
             {/* Active border pulse */}
-            {isActive && (
+            {isActive && !blinkFlash && (
               <div className="absolute inset-0 border-4 border-blue-500/20 animate-pulse pointer-events-none rounded-xl" />
             )}
           </div>
@@ -356,7 +461,7 @@ export default function AttendancePage() {
               <div className="text-center py-12">
                 <CheckSquare className="w-10 h-10 mx-auto mb-3 text-slate-700" />
                 <p className="text-slate-500 text-sm">No attendance logged yet today.</p>
-                <p className="text-slate-600 text-xs mt-1">Start the camera to begin.</p>
+                <p className="text-slate-600 text-xs mt-1">Start the camera and blink.</p>
               </div>
             ) : (
               logs.map((log) => (
@@ -367,9 +472,12 @@ export default function AttendancePage() {
                   <div>
                     <h4 className="font-bold text-slate-200">{log.student_name}</h4>
                     <p className="text-xs text-slate-400 mt-0.5">{log.time}</p>
+                    {log.subject_name && (
+                      <p className="text-xs text-blue-400 mt-0.5">{log.subject_name}</p>
+                    )}
                     {log.recognition_confidence != null && (
                       <p className="text-xs text-slate-600 mt-0.5">
-                        Confidence: {(log.recognition_confidence * 100).toFixed(1)}%
+                        Conf: {(log.recognition_confidence * 100).toFixed(1)}%
                       </p>
                     )}
                   </div>

@@ -11,7 +11,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     Boolean, Column, DateTime, Float, ForeignKey,
-    Integer, String, Text,
+    Integer, String, Text, Time
 )
 from sqlalchemy.orm import DeclarativeBase, relationship
 
@@ -70,6 +70,38 @@ class Student(Base):
         }
 
 
+class Timetable(Base):
+    """
+    Timetable Model
+    
+    Stores subjects and their class times
+    """
+    __tablename__ = 'timetables'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    subject_name = Column(String(100), nullable=False)
+    day_of_week = Column(String(20), nullable=False)  # e.g., 'Monday'
+    start_time = Column(Time, nullable=False)
+    end_time = Column(Time, nullable=False)
+    teacher_id = Column(String(50), nullable=True)
+    
+    # Relationships
+    attendance_records = relationship("Attendance", back_populates="timetable")
+
+    def __repr__(self):
+        return f"<Timetable(subject={self.subject_name}, day={self.day_of_week}, time={self.start_time}-{self.end_time})>"
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'subject_name': self.subject_name,
+            'day_of_week': self.day_of_week,
+            'start_time': self.start_time.strftime('%H:%M:%S') if self.start_time else None,
+            'end_time': self.end_time.strftime('%H:%M:%S') if self.end_time else None,
+            'teacher_id': self.teacher_id
+        }
+
+
 class Attendance(Base):
     """
     Attendance Model
@@ -80,6 +112,7 @@ class Attendance(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     student_id = Column(Integer, ForeignKey('students.id'), nullable=False, index=True)
+    timetable_id = Column(Integer, ForeignKey('timetables.id'), nullable=True, index=True)
     
     # Attendance details
     timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
@@ -101,6 +134,7 @@ class Attendance(Base):
     
     # Relationships
     student = relationship("Student", back_populates="attendance_records")
+    timetable = relationship("Timetable", back_populates="attendance_records")
     
     def __repr__(self):
         return f"<Attendance(student_id={self.student_id}, date={self.date}, time={self.time})>"
@@ -111,6 +145,8 @@ class Attendance(Base):
             'id': self.id,
             'student_id': self.student_id,
             'student_name': self.student.name if self.student else None,
+            'timetable_id': self.timetable_id,
+            'subject_name': self.timetable.subject_name if self.timetable else None,
             'timestamp': self.timestamp.isoformat() if self.timestamp else None,
             'date': self.date,
             'time': self.time,
