@@ -358,7 +358,7 @@ class AttendanceService:
               "students": [
                 {
                   "student_id": "S001",
-                  "student_name": "Alice",
+                  "student_name": "Student Name",
                   "attendance": {1: 3, 2: 0, ...}   # timetable_id -> count
                 }
               ]

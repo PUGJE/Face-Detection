@@ -55,11 +55,11 @@ const CLASS_POLL_INTERVAL_MS = 60000;
 
 function statusBadgeClass(status: AttendanceStatus): string {
   const map: Record<AttendanceStatus, string> = {
-    present: "bg-emerald-500/10 text-emerald-400",
-    late:    "bg-amber-500/10 text-amber-400",
-    absent:  "bg-rose-500/10 text-rose-400",
+    present: "bg-emerald-100 text-[#10B981]",
+    late:    "bg-amber-100 text-amber-700",
+    absent:  "bg-rose-100 text-rose-700",
   };
-  return map[status] ?? "bg-slate-500/10 text-slate-400";
+  return map[status] ?? "bg-slate-500/10 text-slate-500";
 }
 
 // ---------------------------------------------------------------------------
@@ -315,24 +315,24 @@ export default function AttendancePage() {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>
-        <h1 className="text-3xl font-bold text-white">Live Attendance</h1>
-        <p className="text-slate-400">
+        <h1 className="text-3xl font-bold text-slate-800">Live Attendance</h1>
+        <p className="text-slate-500">
           Blink-verified face recognition — scans every {SCAN_INTERVAL_MS / 1000} seconds
         </p>
       </div>
 
       {/* ── Active class banner ─────────────────────────────────────── */}
       {classLoading ? (
-        <div className="glass-panel rounded-xl px-5 py-3 flex items-center gap-3 text-slate-400 text-sm">
+        <div className="glass-panel rounded-2xl px-6 py-4 flex items-center gap-3 text-slate-500 text-sm">
           <Loader2 className="w-4 h-4 animate-spin" />
           Checking class schedule…
         </div>
       ) : activeClass ? (
-        <div className="glass-panel rounded-xl px-5 py-3 flex items-center gap-4 border border-emerald-500/30 bg-emerald-500/5">
+        <div className="glass-panel rounded-2xl px-6 py-4 flex items-center gap-4 border border-emerald-200 bg-emerald-500/5">
           <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
           <div className="flex-1">
             <span className="font-semibold text-emerald-300">{activeClass.subject_name}</span>
-            <span className="text-slate-400 text-sm ml-3">
+            <span className="text-slate-500 text-sm ml-3">
               {activeClass.day_of_week} · {activeClass.start_time} – {activeClass.end_time}
             </span>
           </div>
@@ -341,8 +341,8 @@ export default function AttendancePage() {
           </span>
         </div>
       ) : (
-        <div className="glass-panel rounded-xl px-5 py-3 flex items-center gap-4 border border-amber-500/20 bg-amber-500/5">
-          <Clock className="w-4 h-4 text-amber-400" />
+        <div className="glass-panel rounded-2xl px-6 py-4 flex items-center gap-4 border border-amber-500/20 bg-amber-500/5">
+          <Clock className="w-4 h-4 text-amber-600" />
           <span className="text-amber-300 text-sm font-medium">No class is currently active.</span>
           <span className="text-amber-600 text-xs ml-auto">Attendance is still allowed</span>
         </div>
@@ -353,23 +353,23 @@ export default function AttendancePage() {
         <div className="lg:col-span-2 glass-panel rounded-2xl p-6">
           <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-3">
-              <ScanFace className="w-6 h-6 text-blue-400" />
-              <h2 className="text-xl font-bold text-white">Scanner Feed</h2>
+              <ScanFace className="w-6 h-6 text-blue-600" />
+              <h2 className="text-xl font-bold text-slate-800">Scanner Feed</h2>
             </div>
 
             {/* Engine status pills */}
             <div className="flex items-center gap-2">
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
                 detectorStatus === "ready"
-                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                  : "bg-slate-500/10 text-slate-400 border-slate-500/20"
+                  ? "bg-emerald-100 text-[#10B981] border-emerald-500/20"
+                  : "bg-slate-500/10 text-slate-500 border-slate-500/20"
               }`}>
                 Face
               </span>
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
                 landmarkerStatus === "ready"
-                  ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
-                  : "bg-slate-500/10 text-slate-400 border-slate-500/20"
+                  ? "bg-purple-50 text-purple-600 border-purple-200"
+                  : "bg-slate-500/10 text-slate-500 border-slate-500/20"
               }`}>
                 Blink
               </span>
@@ -377,7 +377,7 @@ export default function AttendancePage() {
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium border transition-colors ${
                   faceStable
                     ? "bg-green-500/10 text-green-400 border-green-500/20"
-                    : "bg-slate-500/10 text-slate-400 border-slate-500/20"
+                    : "bg-slate-500/10 text-slate-500 border-slate-500/20"
                 }`}>
                   {faceStable ? "🔒 Stable" : "Detecting…"}
                 </span>
@@ -388,7 +388,7 @@ export default function AttendancePage() {
               <button
                 id="btn-stop-camera"
                 onClick={stopWebcam}
-                className="bg-red-500/20 text-red-400 px-4 py-2 rounded-lg font-medium hover:bg-red-500/30 transition"
+                className="bg-red-50 text-red-600 px-4 py-2 rounded-2xl font-medium hover:bg-red-500/30 transition"
               >
                 Stop Camera
               </button>
@@ -397,7 +397,7 @@ export default function AttendancePage() {
                 id="btn-start-camera"
                 onClick={startWebcam}
                 disabled={!enginesReady}
-                className="bg-emerald-500/20 text-emerald-400 px-4 py-2 rounded-lg font-medium hover:bg-emerald-500/30 transition flex items-center gap-2 disabled:opacity-50"
+                className="bg-emerald-50 text-[#10B981] px-4 py-2 rounded-2xl font-medium hover:bg-emerald-500/30 transition flex items-center gap-2 disabled:opacity-50"
               >
                 <Camera className="w-5 h-5" />
                 {enginesLoading ? "Loading Engines…" : "Start Camera"}
@@ -407,21 +407,21 @@ export default function AttendancePage() {
 
           {/* Error banner */}
           {webcamError && (
-            <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+            <div className="mb-4 p-3 rounded-2xl bg-red-50 border border-red-200 text-red-600 text-sm">
               ⚠️ {webcamError}
             </div>
           )}
 
           {/* Last scan result toast */}
           {lastScanResult && (
-            <div className="mb-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-300 text-sm font-medium">
+            <div className="mb-4 p-3 rounded-2xl bg-blue-50 border border-blue-200 text-blue-300 text-sm font-medium">
               {lastScanResult}
             </div>
           )}
 
           {/* Blink prompt */}
           {isActive && !blinkDetected && (
-            <div className="mb-4 p-3 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-300 text-sm flex items-center gap-2">
+            <div className="mb-4 p-3 rounded-2xl bg-purple-50 border border-purple-200 text-purple-300 text-sm flex items-center gap-2">
               <Eye className="w-4 h-4" />
               <span>
                 {faceStable
@@ -436,14 +436,14 @@ export default function AttendancePage() {
 
           {/* Blink confirmed flash */}
           {isActive && blinkDetected && (
-            <div className="mb-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm flex items-center gap-2 animate-pulse">
+            <div className="mb-4 p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-300 text-sm flex items-center gap-2 animate-pulse">
               <EyeOff className="w-4 h-4" />
               <span>Blink detected! Scanning face…</span>
             </div>
           )}
 
           {/* Video element */}
-          <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden shadow-2xl border border-slate-700">
+          <div className="relative w-full aspect-video bg-slate-100 rounded-2xl overflow-hidden border border-slate-200">
             <video
               ref={videoRef}
               autoPlay
@@ -474,9 +474,9 @@ export default function AttendancePage() {
 
             {/* Scanning indicator */}
             {isActive && scanning && (
-              <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2">
-                <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
-                <span className="text-xs text-blue-400 font-bold uppercase tracking-wider">
+              <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2 border border-slate-200 shadow-sm">
+                <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+                <span className="text-xs text-blue-600 font-bold uppercase tracking-wider">
                   Scanning
                 </span>
               </div>
@@ -484,12 +484,12 @@ export default function AttendancePage() {
 
             {/* Blink flash overlay */}
             {blinkFlash && (
-              <div className="absolute inset-0 border-4 border-purple-500/60 pointer-events-none rounded-xl animate-pulse" />
+              <div className="absolute inset-0 border-4 border-purple-500/60 pointer-events-none rounded-2xl animate-pulse" />
             )}
 
             {/* Active border pulse */}
             {isActive && !blinkFlash && (
-              <div className="absolute inset-0 border-4 border-blue-500/20 animate-pulse pointer-events-none rounded-xl" />
+              <div className="absolute inset-0 border-[3px] border-[#10B981] shadow-[0_0_30px_rgba(16,185,129,0.4)] animate-pulse pointer-events-none rounded-2xl" />
             )}
           </div>
         </div>
@@ -498,13 +498,13 @@ export default function AttendancePage() {
         <div className="glass-panel rounded-2xl p-6 h-[600px] flex flex-col">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <CheckSquare className="w-6 h-6 text-emerald-400" />
-              <h2 className="text-xl font-bold text-white">Today&apos;s Logs</h2>
+              <CheckSquare className="w-6 h-6 text-[#10B981]" />
+              <h2 className="text-xl font-bold text-slate-800">Today&apos;s Logs</h2>
             </div>
             <button
               onClick={fetchTodayLogs}
               title="Refresh logs"
-              className="text-slate-500 hover:text-slate-300 transition"
+              className="text-slate-500 hover:text-slate-800 transition"
             >
               <RefreshCw className="w-4 h-4" />
             </button>
@@ -513,24 +513,24 @@ export default function AttendancePage() {
           <div className="flex-1 overflow-y-auto space-y-3 pr-1">
             {logs.length === 0 ? (
               <div className="text-center py-12">
-                <CheckSquare className="w-10 h-10 mx-auto mb-3 text-slate-700" />
-                <p className="text-slate-500 text-sm">No attendance logged yet today.</p>
-                <p className="text-slate-600 text-xs mt-1">Start the camera and blink.</p>
+                <CheckSquare className="w-10 h-10 mx-auto mb-3 text-slate-600" />
+                <p className="text-slate-400 text-sm">No attendance logged yet today.</p>
+                <p className="text-slate-400 text-xs mt-1">Start the camera and blink.</p>
               </div>
             ) : (
               logs.map((log) => (
                 <div
                   key={log.id}
-                  className="bg-slate-800/40 border border-slate-700 p-4 rounded-xl flex items-center justify-between"
+                  className="bg-white border border-slate-200 p-4 rounded-2xl flex items-center justify-between shadow-sm"
                 >
                   <div>
-                    <h4 className="font-bold text-slate-200">{log.student_name}</h4>
-                    <p className="text-xs text-slate-400 mt-0.5">{log.time}</p>
+                    <h4 className="font-bold text-slate-900">{log.student_name}</h4>
+                    <p className="text-xs text-slate-500 mt-0.5 font-mono">{log.time}</p>
                     {log.subject_name && (
-                      <p className="text-xs text-blue-400 mt-0.5">{log.subject_name}</p>
+                      <p className="text-xs text-blue-600 mt-0.5">{log.subject_name}</p>
                     )}
                     {log.recognition_confidence != null && (
-                      <p className="text-xs text-slate-600 mt-0.5">
+                      <p className="text-xs text-slate-500 mt-0.5 font-mono">
                         Conf: {(log.recognition_confidence * 100).toFixed(1)}%
                       </p>
                     )}

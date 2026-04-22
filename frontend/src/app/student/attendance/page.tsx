@@ -22,9 +22,9 @@ interface AttendanceRecord {
 
 function statusStyle(status: string) {
   switch (status?.toLowerCase()) {
-    case "present": return "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
-    case "late":    return "bg-amber-500/10  text-amber-400  border border-amber-500/20";
-    default:        return "bg-red-500/10    text-red-400    border border-red-500/20";
+    case "present": return "bg-emerald-100 text-[#10B981] border border-emerald-500/20";
+    case "late":    return "bg-amber-500/10  text-amber-600  border border-amber-500/20";
+    default:        return "bg-red-50    text-red-600    border border-red-500/20";
   }
 }
 
@@ -67,11 +67,11 @@ export default function StudentAttendancePage() {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>
-        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-          <BookOpenCheck className="w-8 h-8 text-blue-400" />
+        <h1 className="text-3xl font-bold text-slate-800 flex items-center gap-3">
+          <BookOpenCheck className="w-8 h-8 text-blue-600" />
           My Attendance
         </h1>
-        <p className="text-slate-400 mt-1">View your full attendance history by subject</p>
+        <p className="text-slate-500 mt-1">View your full attendance history by subject</p>
       </div>
 
       {/* Search bar */}
@@ -87,7 +87,7 @@ export default function StudentAttendancePage() {
             value={studentId}
             onChange={(e) => setStudentId(e.target.value)}
             placeholder="Enter your Student ID  (e.g. CS-2026-001)"
-            className="w-full pl-9 pr-4 py-2.5 bg-slate-800/60 border border-slate-700 rounded-xl text-white placeholder-slate-500
+            className="w-full pl-9 pr-4 py-2.5 bg-slate-50/60 border border-slate-200 rounded-2xl text-slate-800 placeholder-slate-500
               focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition"
           />
         </div>
@@ -95,7 +95,7 @@ export default function StudentAttendancePage() {
           id="fetch-attendance-btn"
           type="submit"
           disabled={loading || !studentId.trim()}
-          className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl font-semibold text-white
+          className="flex items-center gap-2 px-6 py-2.5 bg-[#2563EB] hover:bg-[#2563EB] rounded-2xl font-semibold text-slate-800
             transition shadow-lg shadow-blue-500/20 disabled:opacity-50 whitespace-nowrap"
         >
           {loading
@@ -107,7 +107,7 @@ export default function StudentAttendancePage() {
 
       {/* Error */}
       {error && (
-        <div className="glass-panel rounded-xl px-5 py-4 border border-red-500/30 bg-red-500/5 text-red-400 text-sm">
+        <div className="glass-panel rounded-2xl px-5 py-4 border border-red-200 bg-red-500/5 text-red-600 text-sm">
           ⚠️ {error}
         </div>
       )}
@@ -116,14 +116,14 @@ export default function StudentAttendancePage() {
       {fetched && history.length > 0 && (
         <div className="grid grid-cols-3 gap-4">
           {[
-            { label: "Total Classes", value: history.length, color: "text-blue-400" },
-            { label: "Present / Late", value: `${totalPresent} / ${totalLate}`, color: "text-emerald-400" },
+            { label: "Total Classes", value: history.length, color: "text-blue-600" },
+            { label: "Present / Late", value: `${totalPresent} / ${totalLate}`, color: "text-[#10B981]" },
             { label: "Attendance Rate", value: `${rate}%`,
-              color: rate >= 75 ? "text-emerald-400" : rate >= 50 ? "text-amber-400" : "text-red-400" },
+              color: rate >= 75 ? "text-[#10B981]" : rate >= 50 ? "text-amber-600" : "text-red-600" },
           ].map(({ label, value, color }) => (
             <div key={label} className="glass-panel rounded-2xl p-5 text-center">
               <div className={`text-3xl font-extrabold ${color} mb-1`}>{value}</div>
-              <div className="text-slate-400 text-sm">{label}</div>
+              <div className="text-slate-500 text-sm">{label}</div>
             </div>
           ))}
         </div>
@@ -135,35 +135,35 @@ export default function StudentAttendancePage() {
           {history.length === 0 ? (
             <div className="py-16 text-center">
               <BookOpenCheck className="w-12 h-12 text-slate-700 mx-auto mb-3" />
-              <p className="text-slate-400 font-medium">No attendance records found</p>
+              <p className="text-slate-500 font-medium">No attendance records found</p>
               <p className="text-slate-600 text-sm mt-1">for student ID: {studentId}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="bg-slate-800/60 text-slate-400 text-xs uppercase border-b border-slate-700">
+                <thead className="bg-slate-50/60 text-slate-500 text-xs font-mono uppercase border-b border-slate-200">
                   <tr>
-                    <th className="px-5 py-3 font-semibold">Date</th>
-                    <th className="px-5 py-3 font-semibold">Time</th>
-                    <th className="px-5 py-3 font-semibold">Subject</th>
-                    <th className="px-5 py-3 font-semibold">Status</th>
-                    <th className="px-5 py-3 font-semibold text-right">Confidence</th>
+                    <th className="px-6 py-4 font-semibold">Date</th>
+                    <th className="px-6 py-4 font-semibold">Time</th>
+                    <th className="px-6 py-4 font-semibold">Subject</th>
+                    <th className="px-6 py-4 font-semibold">Status</th>
+                    <th className="px-6 py-4 font-semibold text-right">Confidence</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700/40">
                   {history.map((record, i) => (
-                    <tr key={i} className="hover:bg-slate-800/30 transition-colors">
-                      <td className="px-5 py-3 text-slate-200 font-medium">{record.date}</td>
-                      <td className="px-5 py-3 text-slate-400 font-mono text-xs">{record.time}</td>
-                      <td className="px-5 py-3 text-blue-300 font-medium">
+                    <tr key={i} className="hover:bg-slate-50/30 transition-colors">
+                      <td className="px-6 py-4 text-slate-900 font-medium">{record.date}</td>
+                      <td className="px-6 py-4 text-slate-500 font-mono text-xs">{record.time}</td>
+                      <td className="px-6 py-4 text-blue-300 font-medium">
                         {record.subject_name ?? "General"}
                       </td>
-                      <td className="px-5 py-3">
+                      <td className="px-6 py-4">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusStyle(record.status)}`}>
                           {record.status?.toUpperCase()}
                         </span>
                       </td>
-                      <td className="px-5 py-3 text-right text-slate-500 text-xs font-mono">
+                      <td className="px-6 py-4 text-right text-slate-500 text-xs font-mono font-mono">
                         {record.recognition_confidence != null
                           ? `${(record.recognition_confidence * 100).toFixed(1)}%`
                           : "—"}
@@ -180,7 +180,7 @@ export default function StudentAttendancePage() {
       {!fetched && !loading && !error && (
         <div className="glass-panel rounded-2xl py-16 text-center">
           <Search className="w-12 h-12 text-slate-700 mx-auto mb-3" />
-          <p className="text-slate-400">Enter your Student ID and click Fetch Records</p>
+          <p className="text-slate-500">Enter your Student ID and click Fetch Records</p>
         </div>
       )}
     </div>

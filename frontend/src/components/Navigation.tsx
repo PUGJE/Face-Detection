@@ -25,8 +25,8 @@ export function Navigation() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex items-center space-x-3 shrink-0">
-            <ScanFace className="w-8 h-8 text-blue-400" />
-            <span className="font-bold text-xl tracking-tight text-white">FaceID Core</span>
+            <ScanFace className="w-8 h-8 text-blue-600" />
+            <span className="font-bold text-xl tracking-tight text-slate-800">FaceID Core</span>
           </div>
 
           {/* Links */}
@@ -37,10 +37,10 @@ export function Navigation() {
                 <Link
                   key={href}
                   href={href}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl text-sm font-medium transition-colors whitespace-nowrap ${
                     active
-                      ? "bg-blue-500/20 text-blue-300"
-                      : "text-slate-400 hover:text-white hover:bg-white/5"
+                      ? "bg-blue-50 text-blue-600"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
                   }`}
                 >
                   <Icon className="w-4 h-4" />

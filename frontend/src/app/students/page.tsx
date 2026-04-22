@@ -206,12 +206,12 @@ export default function StudentsPage() {
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white">Students</h1>
-          <p className="text-slate-400 mt-1">Manage students and register Face ID</p>
+          <h1 className="text-3xl font-bold text-slate-800">Students</h1>
+          <p className="text-slate-500 mt-1">Manage students and register Face ID</p>
         </div>
         <button
           onClick={fetchStudents}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 text-sm font-medium transition"
+          className="flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-slate-700 rounded-2xl text-slate-600 text-sm font-medium transition"
         >
           <RefreshCw className="w-4 h-4" /> Refresh
         </button>
@@ -220,17 +220,17 @@ export default function StudentsPage() {
       {/* Delete confirmation modal — password protected */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="glass-panel border border-slate-700 rounded-2xl p-8 max-w-sm w-full shadow-2xl">
-            <Trash2 className="w-12 h-12 text-red-400 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-white text-center mb-1">Delete Student?</h3>
-            <p className="text-slate-400 text-sm text-center mb-5">
-              <span className="text-white font-medium">{deleteTarget.name}</span> ({deleteTarget.student_id})<br />
+          <div className="glass-panel border border-slate-200 rounded-2xl p-8 max-w-sm w-full shadow-2xl">
+            <Trash2 className="w-12 h-12 text-red-600 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-slate-800 text-center mb-1">Delete Student?</h3>
+            <p className="text-slate-500 text-sm text-center mb-5">
+              <span className="text-slate-800 font-medium">{deleteTarget.name}</span> ({deleteTarget.student_id})<br />
               This will soft-delete the record. Face data will be removed.
             </p>
 
             {/* Password gate */}
             <div className="mb-5">
-              <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
                 <Lock className="w-3.5 h-3.5" /> Admin Password Required
               </label>
               <div className="relative">
@@ -242,38 +242,38 @@ export default function StudentsPage() {
                   onChange={(e) => { setDeletePassword(e.target.value); setDeletePassErr(""); }}
                   onKeyDown={(e) => e.key === "Enter" && handleDelete()}
                   placeholder="Enter admin password"
-                  className={`w-full px-4 py-2.5 pr-10 bg-slate-800/60 border rounded-xl text-white
+                  className={`w-full px-4 py-2.5 pr-10 bg-slate-50/60 border rounded-2xl text-slate-800
                     placeholder-slate-500 focus:outline-none focus:ring-2 transition text-sm
                     ${deletePassErr
-                      ? "border-red-500/50 focus:ring-red-500/30"
-                      : "border-slate-700 focus:ring-red-500/30"
+                      ? "border-red-200 focus:ring-red-500/30"
+                      : "border-slate-200 focus:ring-red-500/30"
                     }`}
                 />
                 <button
                   type="button"
                   tabIndex={-1}
                   onClick={() => setShowDelPass(!showDelPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-600 transition"
                 >
                   {showDelPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
               {deletePassErr && (
-                <p className="text-red-400 text-xs font-medium mt-1.5">{deletePassErr}</p>
+                <p className="text-red-600 text-xs font-medium mt-1.5">{deletePassErr}</p>
               )}
             </div>
 
             <div className="flex gap-3">
               <button
                 onClick={closeDeleteModal}
-                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium transition"
+                className="flex-1 py-2.5 rounded-2xl bg-slate-50 hover:bg-slate-700 text-slate-600 font-medium transition"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDelete}
                 disabled={deleting || !deletePassword}
-                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold transition flex items-center justify-center gap-2 disabled:opacity-60"
+                className="flex-1 py-2.5 rounded-2xl bg-red-600 hover:bg-red-500 text-slate-800 font-semibold transition flex items-center justify-center gap-2 disabled:opacity-60"
               >
                 {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                 Delete
@@ -285,10 +285,10 @@ export default function StudentsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Registration form */}
-        <div className="glass-panel rounded-2xl p-6 h-fit border border-purple-500/30">
+        <div className="glass-panel rounded-2xl p-6 h-fit border border-purple-200">
           <div className="flex items-center gap-3 mb-6">
-            <UserPlus className="text-purple-400 w-6 h-6" />
-            <h2 className="text-xl font-bold text-white">Add New Student</h2>
+            <UserPlus className="text-purple-600 w-6 h-6" />
+            <h2 className="text-xl font-bold text-slate-800">Add New Student</h2>
           </div>
 
           <form onSubmit={handleCreateStudent} className="space-y-4">
@@ -298,20 +298,20 @@ export default function StudentsPage() {
               { label: "Department", value: department, setter: setDepartment, placeholder: "Computer Science", required: false },
             ].map(({ label, value, setter, placeholder, required }) => (
               <div key={label}>
-                <label className="text-slate-400 text-sm block mb-1">{label}</label>
+                <label className="text-slate-500 text-sm block mb-1">{label}</label>
                 <input
                   required={required}
                   value={value}
                   onChange={(e) => setter(e.target.value)}
                   placeholder={placeholder}
-                  className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30 transition"
+                  className="w-full bg-slate-50/50 border border-slate-200 rounded-2xl px-4 py-2.5 text-slate-800 placeholder-slate-500 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30 transition"
                 />
               </div>
             ))}
             <button
               disabled={submitting}
               type="submit"
-              className="w-full mt-4 bg-purple-600 hover:bg-purple-700 transition text-white font-bold py-2.5 rounded-lg flex justify-center items-center gap-2"
+              className="w-full mt-4 bg-purple-600 hover:bg-purple-700 transition text-slate-800 font-bold py-2.5 rounded-2xl flex justify-center items-center gap-2"
             >
               {submitting ? <Loader2 className="animate-spin w-5 h-5" /> : <UserPlus className="w-5 h-5" />}
               Create Student
@@ -322,9 +322,9 @@ export default function StudentsPage() {
         {/* Student list */}
         <div className="lg:col-span-2 glass-panel rounded-2xl p-6">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-white">Registered Database</h2>
+            <h2 className="text-xl font-bold text-slate-800">Registered Database</h2>
             {detectorStatus === "loading" && (
-              <span className="flex items-center gap-2 text-sm text-amber-400 bg-amber-400/10 px-3 py-1.5 rounded-full border border-amber-400/20">
+              <span className="flex items-center gap-2 text-sm text-amber-600 bg-amber-400/10 px-3 py-1.5 rounded-full border border-amber-400/20">
                 <Loader2 className="w-4 h-4 animate-spin" /> Loading ML Engine…
               </span>
             )}
@@ -332,22 +332,22 @@ export default function StudentsPage() {
 
           {/* Webcam panel */}
           {capturingFor && (
-            <div className="mb-6 p-4 rounded-xl bg-slate-900/50 border border-slate-700">
+            <div className="mb-6 p-4 rounded-2xl bg-white/50 border border-slate-200">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-emerald-400 font-bold flex items-center gap-2">
+                <h3 className="text-[#10B981] font-bold flex items-center gap-2">
                   <Camera className="w-5 h-5" /> Registering: {capturingFor}
                 </h3>
-                <button onClick={stopWebcam} className="text-slate-400 hover:text-white transition text-sm">
+                <button onClick={stopWebcam} className="text-slate-500 hover:text-slate-800 transition text-sm">
                   Cancel
                 </button>
               </div>
-              <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden border border-slate-700">
+              <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden border border-slate-200">
                 <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
               </div>
               <button
                 disabled={registering || detectorStatus !== "ready"}
                 onClick={captureAndRegister}
-                className="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 transition text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                className="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 transition text-slate-800 font-bold py-3 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {registering ? <Loader2 className="animate-spin" /> : <UploadCloud />}
                 Capture & Register
@@ -356,15 +356,15 @@ export default function StudentsPage() {
           )}
 
           {/* Table */}
-          <div className="overflow-x-auto rounded-xl border border-slate-700/50">
-            <table className="w-full text-left text-slate-300">
-              <thead className="bg-slate-800/60 text-slate-400 text-xs uppercase">
+          <div className="overflow-x-auto rounded-2xl border border-slate-200/50">
+            <table className="w-full text-left text-slate-600">
+              <thead className="bg-slate-50/60 text-slate-500 text-xs font-mono uppercase">
                 <tr>
-                  <th className="px-4 py-3">ID</th>
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">Dept</th>
-                  <th className="px-4 py-3">Face ID</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-6 py-4">ID</th>
+                  <th className="px-6 py-4">Name</th>
+                  <th className="px-6 py-4">Dept</th>
+                  <th className="px-6 py-4">Face ID</th>
+                  <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/40">
@@ -376,13 +376,13 @@ export default function StudentsPage() {
                   <tr><td colSpan={5} className="text-center py-10 text-slate-500">No students found.</td></tr>
                 ) : (
                   students.map((s) => (
-                    <tr key={s.student_id} className="hover:bg-slate-800/30 transition-colors group">
-                      <td className="px-4 py-3 font-mono text-white font-medium text-sm">{s.student_id}</td>
-                      <td className="px-4 py-3 font-medium">{s.name}</td>
-                      <td className="px-4 py-3 text-slate-400">{s.department ?? "—"}</td>
-                      <td className="px-4 py-3">
+                    <tr key={s.student_id} className="hover:bg-slate-50/30 transition-colors group">
+                      <td className="px-6 py-4 font-mono text-slate-800 font-medium text-sm">{s.student_id}</td>
+                      <td className="px-6 py-4 font-medium">{s.name}</td>
+                      <td className="px-6 py-4 text-slate-500">{s.department ?? "—"}</td>
+                      <td className="px-6 py-4">
                         {s.face_registered ? (
-                          <span className="text-emerald-400 bg-emerald-400/10 px-2.5 py-1 rounded-full text-xs font-bold border border-emerald-400/20">
+                          <span className="text-[#10B981] bg-emerald-400/10 px-2.5 py-1 rounded-full text-xs font-bold border border-emerald-400/20">
                             ✓ Registered
                           </span>
                         ) : (
@@ -391,18 +391,18 @@ export default function StudentsPage() {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => startWebcam(s.student_id)}
                             disabled={detectorStatus !== "ready"}
-                            className="px-3 py-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 text-xs font-semibold border border-blue-500/20 transition disabled:opacity-40"
+                            className="px-3 py-1.5 rounded-2xl bg-blue-50 hover:bg-[#2563EB]/20 text-blue-600 text-xs font-semibold border border-blue-500/20 transition disabled:opacity-40"
                           >
                             Add Face
                           </button>
                           <button
                             onClick={() => openDeleteModal(s)}
-                            className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition"
+                            className="p-1.5 rounded-2xl bg-red-50 hover:bg-red-50 text-red-600 border border-red-500/20 transition"
                             title="Delete student"
                           >
                             <Trash2 className="w-3.5 h-3.5" />

@@ -23,7 +23,7 @@ export default async function Home() {
         <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
           Dashboard Overview
         </h1>
-        <p className="text-slate-400 mt-2 text-lg">
+        <p className="text-slate-500 mt-2 text-lg">
           Live statistics from the FaceID Core engine
         </p>
       </div>
@@ -31,36 +31,36 @@ export default async function Home() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="glass-panel rounded-2xl p-6 hover:-translate-y-1 transition-transform">
           <div className="flex items-center space-x-4">
-            <div className="p-3 bg-blue-500/20 rounded-xl">
-              <Users className="w-8 h-8 text-blue-400" />
+            <div className="p-3 bg-[#2563EB]/20 rounded-2xl">
+              <Users className="w-8 h-8 text-blue-600" />
             </div>
             <div>
-              <p className="text-slate-400 text-sm font-medium">Registered Students</p>
-              <h2 className="text-3xl font-bold text-white">{summary.total_faces}</h2>
+              <p className="text-slate-500 text-sm font-medium">Registered Students</p>
+              <h2 className="text-3xl font-bold text-slate-800">{summary.total_faces}</h2>
             </div>
           </div>
         </div>
 
         <div className="glass-panel rounded-2xl p-6 hover:-translate-y-1 transition-transform">
           <div className="flex items-center space-x-4">
-            <div className="p-3 bg-emerald-500/20 rounded-xl">
-              <CheckCircle className="w-8 h-8 text-emerald-400" />
+            <div className="p-3 bg-emerald-50 rounded-2xl">
+              <CheckCircle className="w-8 h-8 text-[#10B981]" />
             </div>
             <div>
-              <p className="text-slate-400 text-sm font-medium">System Status</p>
-              <h2 className="text-xl font-bold text-white">{statsRes.success ? "Online" : "Offline"}</h2>
+              <p className="text-slate-500 text-sm font-medium">System Status</p>
+              <h2 className="text-xl font-bold text-slate-800">{statsRes.success ? "Online" : "Offline"}</h2>
             </div>
           </div>
         </div>
 
         <div className="glass-panel rounded-2xl p-6 hover:-translate-y-1 transition-transform">
           <div className="flex items-center space-x-4">
-            <div className="p-3 bg-purple-500/20 rounded-xl">
-              <XCircle className="w-8 h-8 text-purple-400" />
+            <div className="p-3 bg-purple-500/20 rounded-2xl">
+              <XCircle className="w-8 h-8 text-purple-600" />
             </div>
             <div>
-              <p className="text-slate-400 text-sm font-medium">Active Engine</p>
-              <h2 className="text-xl font-bold text-white uppercase">{summary.model_name}</h2>
+              <p className="text-slate-500 text-sm font-medium">Active Engine</p>
+              <h2 className="text-xl font-bold text-slate-800 uppercase">{summary.model_name}</h2>
             </div>
           </div>
         </div>
