@@ -11,8 +11,7 @@ fails, and for standalone testing.
 """
 
 import logging
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import cv2
 import numpy as np
@@ -104,73 +103,3 @@ class FaceDetector:
             return None
         return face_crop
     
-    def draw_detections(self, image: np.ndarray, faces: List[Dict[str, Any]], 
-                       draw_keypoints: bool = True) -> np.ndarray:
-        output_image = image.copy()
-        for face in faces:
-            x, y, w, h = face['bbox']
-            confidence = face['confidence']
-            cv2.rectangle(output_image, (x, y), (x + w, y + h), (0, 255, 0), 2)
-            label = f"Face: {confidence:.2f}"
-            cv2.putText(output_image, label, (x, y - 10), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-        return output_image
-    
-    def detect_from_file(self, image_path: str) -> Tuple[Optional[np.ndarray], List[Dict[str, Any]]]:
-        if not Path(image_path).exists():
-            return None, []
-        image = cv2.imread(image_path)
-        if image is None:
-            return None, []
-        return image, self.detect_faces(image)
-        
-    def process_video_stream(self, camera_index: int = 0, display: bool = True) -> None:
-        cap = cv2.VideoCapture(camera_index)
-        if not cap.isOpened():
-            return
-            
-        try:
-            while True:
-                ret, frame = cap.read()
-                if not ret: break
-                
-                faces = self.detect_faces(frame)
-                output_frame = self.draw_detections(frame, faces)
-                
-                if display:
-                    cv2.imshow('Face Detection', output_frame)
-                    
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
-        finally:
-            cap.release()
-            cv2.destroyAllWindows()
-            
-    def __del__(self):
-        pass
-
-
-def align_face(
-    image: np.ndarray,
-    keypoints: List[Tuple[int, int]],
-) -> np.ndarray:
-    """
-    No-op alignment shim.
-
-    Haar cascades do not produce facial landmarks, so this function simply
-    returns the image unchanged. Kept for API compatibility.
-    """
-    return image
-
-
-def resize_face(
-    image: np.ndarray,
-    target_size: Tuple[int, int] = (160, 160),
-) -> np.ndarray:
-    """Resize a face crop to ``target_size`` using area interpolation."""
-    return cv2.resize(image, target_size, interpolation=cv2.INTER_AREA)
-
-
-def normalize_face(image: np.ndarray) -> np.ndarray:
-    """Scale pixel values from [0, 255] to [0.0, 1.0]."""
-    return image.astype(np.float32) / 255.0

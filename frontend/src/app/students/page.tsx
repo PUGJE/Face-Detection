@@ -170,8 +170,8 @@ export default function StudentsPage() {
       const sh   = Math.min(canvas.height - sy, face.height + 2 * padY);
 
       const crop = document.createElement("canvas");
-      crop.width  = sw; crop.height = sh;
-      crop.getContext("2d")?.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+      crop.width  = 112; crop.height = 112;
+      crop.getContext("2d")?.drawImage(canvas, sx, sy, sw, sh, 0, 0, 112, 112);
 
       crop.toBlob(async (blob) => {
         if (!blob) { setRegistering(false); return; }
@@ -195,7 +195,7 @@ export default function StudentsPage() {
         } finally {
           setRegistering(false);
         }
-      }, "image/jpeg", 0.9);
+      }, "image/jpeg", 0.7);
     } catch {
       alert("Error processing the image.");
       setRegistering(false);

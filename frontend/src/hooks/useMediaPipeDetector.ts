@@ -25,14 +25,6 @@ const MEDIAPIPE_CDN =
 const MODEL_URL =
   "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite";
 
-interface UseMediaPipeDetectorResult {
-  /** Ref to the loaded FaceDetector instance. Check detectorStatus before using. */
-  detectorRef: React.MutableRefObject<any>;
-  /** Current state of the detector. Use detector only when "ready". */
-  detectorStatus: React.MutableRefObject<DetectorStatus>;
-  /** React state setter — triggers re-renders when status changes. */
-  setDetectorStatus: React.Dispatch<React.SetStateAction<DetectorStatus>>;
-}
 
 export function useMediaPipeDetector(): {
   detectorRef: React.MutableRefObject<any>;

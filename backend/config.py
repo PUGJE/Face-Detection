@@ -122,16 +122,3 @@ class Settings(BaseSettings):
 # Single global instance — import this throughout the project
 settings = Settings()
 
-
-# ---------------------------------------------------------------------------
-# CLI / manual test
-# ---------------------------------------------------------------------------
-if __name__ == "__main__":
-    print("=" * 60)
-    print("CONFIGURATION")
-    print("=" * 60)
-    for field_name, value in settings.model_dump().items():
-        print(f"  {field_name}: {value}")
-    print("\nCreating directories …")
-    settings.create_directories()
-    print("✓ Done.")

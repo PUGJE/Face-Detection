@@ -12,7 +12,6 @@ import { useEffect, useState } from "react";
 import { BookOpen, Users, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import { AdminGuard } from "@/components/AdminGuard";
 
-const API = ""; // relative — Next.js proxy forwards /api/* → FastAPI
 
 interface SubjectStat {
   timetable_id: number;
@@ -73,7 +72,7 @@ export default function AdminDashboardPage() {
     setLoading(true);
     setError("");
     try {
-      const res  = await fetch(`${API}/api/attendance/summary`);
+      const res  = await fetch(`/api/attendance/summary`);
       if (!res.ok) throw new Error("Failed to fetch statistics");
       const data = await res.json();
       setStats(data.data ?? []);
@@ -87,7 +86,7 @@ export default function AdminDashboardPage() {
   async function fetchMatrix() {
     setMatrixLoading(true);
     try {
-      const res  = await fetch(`${API}/api/attendance/report/matrix`);
+      const res  = await fetch(`/api/attendance/report/matrix`);
       if (!res.ok) throw new Error("Failed to fetch matrix");
       const data = await res.json();
       setMatrix(data.data ?? null);

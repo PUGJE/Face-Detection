@@ -99,9 +99,7 @@ class AttendanceService:
             time_str = now.strftime("%H:%M:%S")
             day_name = now.strftime("%A")
 
-            # Duplicate check: one record per student per day
-            # (Note for Timetable support: if one student can attend multiple classes,
-            # this check should probably include the timetable_id. For now, we update to check per timetable_id)
+            # Duplicate check: one record per student per class slot per day
             current_time = now.time()
             active_timetable = (
                 self.session.query(Timetable)
@@ -442,20 +440,3 @@ class AttendanceService:
             
         return stats
 
-
-# ---------------------------------------------------------------------------
-# Manual test
-# ---------------------------------------------------------------------------
-if __name__ == "__main__":
-    from backend.database.connection import init_database
-
-    print("=" * 60)
-    print("ATTENDANCE SERVICE TEST")
-    print("=" * 60)
-    init_database()
-    service = AttendanceService()
-    stats = service.get_attendance_statistics()
-    print(f"\nTotal students:  {stats['total_students']}")
-    print(f"Total records:   {stats['total_attendance_records']}")
-    print(f"Today's count:   {stats['today_attendance']}")
-    print("\n✓ Test complete.")

@@ -14,7 +14,7 @@ Direct DB operations inside methods here use short-lived sessions via
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import cv2
 import numpy as np
@@ -195,81 +195,3 @@ class AttendanceSystem:
 
         return {"face_recognition": face_stats, "attendance": attendance_stats}
 
-
-# ---------------------------------------------------------------------------
-# NOTE: Optional webcam-based attendance scanning (not used by the HTTP API).
-#
-# If you want batch attendance via webcam from the command line, instantiate
-# AttendanceSystem() directly and call process_webcam_attendance().
-# ---------------------------------------------------------------------------
-
-def run_webcam_attendance(duration_seconds: int = 60) -> List[Dict[str, Any]]:
-    """
-    Standalone webcam attendance loop — NOT used by the HTTP API.
-
-    Reads frames from the default camera, identifies faces, and writes
-    attendance records until `duration_seconds` have elapsed.
-
-    Args:
-        duration_seconds: How long to keep the camera open.
-
-    Returns:
-        List of attendance result dicts for every student identified.
-    """
-    import time
-
-    system = AttendanceSystem()
-    from backend.services.attendance_service import AttendanceService
-
-    results: List[Dict[str, Any]] = []
-    processed: set = set()
-
-    cap = cv2.VideoCapture(settings.camera_index)
-    if not cap.isOpened():
-        logger.error("Could not open camera.")
-        return results
-
-    start = time.time()
-    try:
-        while (time.time() - start) < duration_seconds:
-            ret, frame = cap.read()
-            if not ret:
-                continue
-
-            for rec in system.face_pipeline.process_attendance_frame(frame):
-                if not rec["recognized"] or rec["student_id"] in processed:
-                    continue
-
-                with db_manager.session_scope() as session:
-                    att = AttendanceService(session).mark_attendance(
-                        student_id=rec["student_id"],
-                        recognition_confidence=rec.get("confidence"),
-                        recognition_distance=rec.get("distance"),
-                    )
-
-                if att["success"]:
-                    results.append(att)
-                    processed.add(rec["student_id"])
-                    logger.info(f"Attendance marked: {rec['student_id']}")
-    finally:
-        cap.release()
-        cv2.destroyAllWindows()
-
-    return results
-
-
-# ---------------------------------------------------------------------------
-# Manual test
-# ---------------------------------------------------------------------------
-if __name__ == "__main__":
-    print("=" * 60)
-    print("ATTENDANCE SYSTEM TEST")
-    print("=" * 60)
-
-    system = AttendanceSystem()
-    stats = system.get_system_stats()
-
-    print(f"\nRegistered faces:   {stats['face_recognition']['recognizer']['total_faces']}")
-    print(f"Total DB students:  {stats['attendance']['total_students']}")
-    print(f"Today's attendance: {stats['attendance']['today_attendance']}")
-    print("\n✓ Test complete.")

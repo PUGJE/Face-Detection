@@ -47,8 +47,10 @@ interface ActiveClass {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const SCAN_INTERVAL_MS      = 3000;
-const LOG_POLL_INTERVAL_MS  = 10000;
+const SCAN_INTERVAL_MS       = 500;    // blink-gated server scan
+const DETECT_INTERVAL_MS     = 300;    // continuous client-side face stability check
+const STREAK_REQUIRED        = 3;      // consecutive frames with face before scan fires
+const LOG_POLL_INTERVAL_MS   = 10000;
 const CLASS_POLL_INTERVAL_MS = 60000;
 
 function statusBadgeClass(status: AttendanceStatus): string {
@@ -65,21 +67,24 @@ function statusBadgeClass(status: AttendanceStatus): string {
 // ---------------------------------------------------------------------------
 
 export default function AttendancePage() {
-  const videoRef     = useRef<HTMLVideoElement>(null);
-  const streamRef    = useRef<MediaStream | null>(null);
-  const scanTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const classTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const isActiveRef  = useRef(false);
+  const videoRef        = useRef<HTMLVideoElement>(null);
+  const streamRef       = useRef<MediaStream | null>(null);
+  const scanTimerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const detectTimerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollTimerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const classTimerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isActiveRef     = useRef(false);
+  const streakRef       = useRef(0); // consecutive frames where a face was detected
 
-  const [isActive,      setIsActive]      = useState(false);
-  const [logs,          setLogs]          = useState<LogEntry[]>([]);
-  const [scanning,      setScanning]      = useState(false);
-  const [webcamError,   setWebcamError]   = useState<string | null>(null);
+  const [isActive,       setIsActive]       = useState(false);
+  const [logs,           setLogs]           = useState<LogEntry[]>([]);
+  const [scanning,       setScanning]       = useState(false);
+  const [webcamError,    setWebcamError]    = useState<string | null>(null);
   const [lastScanResult, setLastScanResult] = useState<string | null>(null);
-  const [activeClass,   setActiveClass]   = useState<ActiveClass | null>(null);
-  const [classLoading,  setClassLoading]  = useState(true);
-  const [blinkFlash,    setBlinkFlash]    = useState(false);
+  const [activeClass,    setActiveClass]    = useState<ActiveClass | null>(null);
+  const [classLoading,   setClassLoading]   = useState(true);
+  const [blinkFlash,     setBlinkFlash]     = useState(false);
+  const [faceStable,     setFaceStable]     = useState(false); // streak met
 
   // Shared MediaPipe face detector (BlazeFace) — loaded once on mount
   const { detectorRef, detectorStatus } = useMediaPipeDetector();
@@ -141,18 +146,49 @@ export default function AttendancePage() {
 
 
   // ------------------------------------------------------------------
-  // Scanning
+  // Continuous face-stability detector (no blink gate, no server call)
+  // Fills streakRef; updates faceStable UI indicator
+  // ------------------------------------------------------------------
+
+  const detectFaceContinuously = useCallback(async () => {
+    if (!isActiveRef.current || !videoRef.current || !detectorRef.current) return;
+    if (videoRef.current.readyState < 2) return;
+
+    const canvas = document.createElement("canvas");
+    canvas.width  = videoRef.current.videoWidth  || 640;
+    canvas.height = videoRef.current.videoHeight || 480;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(videoRef.current, 0, 0);
+
+    try {
+      const { detections } = detectorRef.current.detect(canvas);
+      if (detections?.length) {
+        streakRef.current = Math.min(streakRef.current + 1, STREAK_REQUIRED);
+      } else {
+        streakRef.current = Math.max(streakRef.current - 1, 0);
+      }
+      setFaceStable(streakRef.current >= STREAK_REQUIRED);
+    } catch { /* ignore */ }
+  }, [detectorRef]);
+
+  // ------------------------------------------------------------------
+  // Blink-gated server scan (fires only when streak is met + blink)
   // ------------------------------------------------------------------
 
   const captureAndScan = useCallback(async () => {
     if (!isActiveRef.current || !videoRef.current || !detectorRef.current) return;
     if (videoRef.current.readyState < 2) return;
 
-    // 🔒 Blink gate — read from ref (never stale inside setInterval closure)
+    // 🔒 Blink gate
     if (!blinkRef.current) return;
-    // Consume the blink immediately so only one scan fires per blink
+    // 🔒 Streak gate — face must have been stable for STREAK_REQUIRED frames
+    if (streakRef.current < STREAK_REQUIRED) return;
+
     blinkRef.current = false;
     resetBlink();
+    streakRef.current = 0;
+    setFaceStable(false);
 
     setScanning(true);
 
@@ -171,7 +207,7 @@ export default function AttendancePage() {
       const face = detections[0].boundingBox;
       if (!face) { setScanning(false); return; }
 
-      // 2. Crop face with 25% padding
+      // 2. Crop and resize to 112×112 (ArcFace native size — smaller payload)
       const padX = face.width  * 0.25;
       const padY = face.height * 0.25;
       const sx   = Math.max(0, face.originX - padX);
@@ -180,9 +216,9 @@ export default function AttendancePage() {
       const sh   = Math.min(canvas.height - sy, face.height + 2 * padY);
 
       const cropCanvas = document.createElement("canvas");
-      cropCanvas.width  = sw;
-      cropCanvas.height = sh;
-      cropCanvas.getContext("2d")?.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+      cropCanvas.width  = 112;
+      cropCanvas.height = 112;
+      cropCanvas.getContext("2d")?.drawImage(canvas, sx, sy, sw, sh, 0, 0, 112, 112);
 
       cropCanvas.toBlob(async (blob) => {
         if (!blob) { setScanning(false); return; }
@@ -208,7 +244,7 @@ export default function AttendancePage() {
         } finally {
           setScanning(false);
         }
-      }, "image/jpeg", 0.9);
+      }, "image/jpeg", 0.7);
     } catch (err) {
       console.error("Error during face scan:", err);
       setScanning(false);
@@ -233,12 +269,15 @@ export default function AttendancePage() {
       isActiveRef.current = true;
       setIsActive(true);
 
-      // Start internal rAF-based blink loop
+      // Start rAF-based blink loop
       if (videoRef.current) startBlink(videoRef.current);
 
-      scanTimerRef.current  = setInterval(captureAndScan, SCAN_INTERVAL_MS);
-      pollTimerRef.current  = setInterval(fetchTodayLogs, LOG_POLL_INTERVAL_MS);
-      classTimerRef.current = setInterval(fetchActiveClass, CLASS_POLL_INTERVAL_MS);
+      // Continuous face-stability check (no blink needed)
+      detectTimerRef.current  = setInterval(detectFaceContinuously, DETECT_INTERVAL_MS);
+      // Blink-gated server scan
+      scanTimerRef.current    = setInterval(captureAndScan,          SCAN_INTERVAL_MS);
+      pollTimerRef.current    = setInterval(fetchTodayLogs,          LOG_POLL_INTERVAL_MS);
+      classTimerRef.current   = setInterval(fetchActiveClass,        CLASS_POLL_INTERVAL_MS);
     } catch (err: any) {
       setWebcamError(err?.message ?? "Camera permission denied or unavailable.");
     }
@@ -246,9 +285,11 @@ export default function AttendancePage() {
 
   function stopWebcam() {
     isActiveRef.current = false;
-    stopBlink(); // stop internal rAF loop
+    stopBlink();
+    streakRef.current = 0;
+    setFaceStable(false);
 
-    [scanTimerRef, pollTimerRef, classTimerRef].forEach((r) => {
+    [scanTimerRef, detectTimerRef, pollTimerRef, classTimerRef].forEach((r) => {
       if (r.current) { clearInterval(r.current); r.current = null; }
     });
 
@@ -332,6 +373,15 @@ export default function AttendancePage() {
               }`}>
                 Blink
               </span>
+              {isActive && (
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium border transition-colors ${
+                  faceStable
+                    ? "bg-green-500/10 text-green-400 border-green-500/20"
+                    : "bg-slate-500/10 text-slate-400 border-slate-500/20"
+                }`}>
+                  {faceStable ? "🔒 Stable" : "Detecting…"}
+                </span>
+              )}
             </div>
 
             {isActive ? (
@@ -373,7 +423,11 @@ export default function AttendancePage() {
           {isActive && !blinkDetected && (
             <div className="mb-4 p-3 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-300 text-sm flex items-center gap-2">
               <Eye className="w-4 h-4" />
-              <span>Blink to verify liveness and mark attendance</span>
+              <span>
+                {faceStable
+                  ? "Face locked — blink to mark attendance"
+                  : "Position your face in the camera…"}
+              </span>
               {currentEar !== null && (
                 <span className="ml-auto text-purple-500 text-xs font-mono">EAR {currentEar}</span>
               )}

@@ -99,15 +99,6 @@ class FaceRecognizer:
             logger.error(f"Failed to add embedding for '{student_id}': {e}")
             return False
 
-    # DEPRECATED — raw images cannot be embedded without the InsightFace pipeline.
-    # Use add_embedding() with a pre-computed ArcFace vector instead.
-    def add_face_to_database(self, student_id: str, face_image: np.ndarray) -> bool:
-        """Legacy shim — not supported in ArcFace+FAISS mode. Always returns False."""
-        logger.warning(
-            "add_face_to_database() called with raw image — "
-            "use add_embedding() with a pre-computed ArcFace vector."
-        )
-        return False
 
     def remove_face_from_database(self, student_id: str) -> bool:
         if student_id not in self._raw:
@@ -151,14 +142,6 @@ class FaceRecognizer:
             "matched": True,
         }
 
-    # DEPRECATED — raw images are not supported; use recognize_from_embedding() instead.
-    def recognize_face(self, face_image: np.ndarray) -> Optional[Dict[str, Any]]:
-        """Legacy interface — not supported in ArcFace+FAISS mode. Always returns None."""
-        logger.warning(
-            "recognize_face() called with raw image — "
-            "use recognize_from_embedding() with a pre-computed ArcFace vector."
-        )
-        return None
 
     # ------------------------------------------------------------------
     # Verification (1:1)
@@ -173,37 +156,63 @@ class FaceRecognizer:
         score = float(np.mean(scores))
         return score >= self.recognition_threshold, score
 
-    # DEPRECATED — raw images are not supported; use verify_from_embedding() instead.
-    def verify_face(self, face_image: np.ndarray, student_id: str) -> Tuple[bool, float]:
-        """Legacy interface — not supported in ArcFace+FAISS mode. Always returns (False, 0.0)."""
-        return False, 0.0
 
     # ------------------------------------------------------------------
     # Persistence (pickle raw vectors; rebuild FAISS on load)
     # ------------------------------------------------------------------
 
     def save_embeddings(self, file_path: str) -> bool:
+        """Persist raw vectors (.pkl) and the compiled FAISS index (.faiss)."""
         try:
-            path = Path(file_path).with_suffix(".pkl")
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with open(path, "wb") as f:
-                pickle.dump(self._raw, f)
-            logger.info(f"Saved {len(self._raw)} identities → {path}")
+            base = Path(file_path).with_suffix("")
+            base.parent.mkdir(parents=True, exist_ok=True)
+            # Raw vectors + id-map (needed for backward compat and index rebuilds)
+            with open(str(base) + ".pkl", "wb") as f:
+                pickle.dump({
+                    "raw": self._raw,
+                    "id_map": self._faiss_id_to_student,
+                    "id_counter": self._id_counter,
+                }, f)
+            # Compiled FAISS index (loaded directly on next startup)
+            faiss.write_index(self._index, str(base) + ".faiss")
+            logger.info(f"Saved {len(self._raw)} identities → {base}.pkl + .faiss")
             return True
         except Exception as e:
             logger.error(f"Save error: {e}")
             return False
 
     def load_embeddings(self, file_path: str) -> bool:
+        """Load embeddings from disk. Uses FAISS binary if available, else rebuilds."""
         try:
-            path = Path(file_path).with_suffix(".pkl")
-            if not path.exists():
-                logger.warning(f"No embeddings file at {path}")
+            base = Path(file_path).with_suffix("")
+            pkl_path  = Path(str(base) + ".pkl")
+            faiss_path = Path(str(base) + ".faiss")
+
+            if not pkl_path.exists():
+                logger.warning(f"No embeddings file at {pkl_path}")
                 return False
-            with open(path, "rb") as f:
-                self._raw = pickle.load(f)
-            self._rebuild_index()
-            logger.info(f"Loaded {len(self._raw)} identities, rebuilt FAISS index ({self._index.ntotal} vectors)")
+
+            with open(pkl_path, "rb") as f:
+                data = pickle.load(f)
+
+            if isinstance(data, dict) and "raw" in data:
+                # New format: contains metadata + separate FAISS file
+                self._raw = data["raw"]
+                self._faiss_id_to_student = data["id_map"]
+                self._id_counter = data["id_counter"]
+                if faiss_path.exists():
+                    self._index = faiss.read_index(str(faiss_path))
+                    logger.info(f"Loaded FAISS index from {faiss_path} ({self._index.ntotal} vectors)")
+                else:
+                    self._rebuild_index()
+                    logger.info("Rebuilt FAISS index from raw vectors (no .faiss file found)")
+            else:
+                # Legacy format: just the raw dict — rebuild index
+                self._raw = data
+                self._rebuild_index()
+                logger.info(f"Loaded legacy format, rebuilt FAISS index ({self._index.ntotal} vectors)")
+
+            logger.info(f"Loaded {len(self._raw)} identities")
             return True
         except Exception as e:
             logger.error(f"Load error: {e}")

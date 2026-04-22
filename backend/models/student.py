@@ -11,7 +11,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     Boolean, Column, DateTime, Float, ForeignKey,
-    Integer, String, Text, Time
+    Index, Integer, String, Text, Time
 )
 from sqlalchemy.orm import DeclarativeBase, relationship
 
@@ -135,6 +135,14 @@ class Attendance(Base):
     # Relationships
     student = relationship("Student", back_populates="attendance_records")
     timetable = relationship("Timetable", back_populates="attendance_records")
+
+    __table_args__ = (
+        # Composite index speeds up the per-student-per-class duplicate check
+        Index(
+            'ix_attendance_student_date_timetable',
+            'student_id', 'date', 'timetable_id',
+        ),
+    )
     
     def __repr__(self):
         return f"<Attendance(student_id={self.student_id}, date={self.date}, time={self.time})>"
@@ -197,37 +205,3 @@ class User(Base):
             'last_login': self.last_login.isoformat() if self.last_login else None
         }
 
-
-# Test function
-if __name__ == "__main__":
-    print("=" * 60)
-    print("DATABASE MODELS TEST")
-    print("=" * 60)
-    
-    # Create sample student
-    student = Student(
-        student_id="STUDENT_001",
-        name="John Doe",
-        email="john@example.com",
-        enrollment_number="EN2024001",
-        department="Computer Science",
-        year="3rd Year"
-    )
-    
-    print("\nSample Student:")
-    print(student)
-    print(student.to_dict())
-    
-    # Create sample attendance
-    attendance = Attendance(
-        student_id=1,
-        date="2026-01-29",
-        time="09:30:00",
-        recognition_confidence=0.95,
-        status="present"
-    )
-    
-    print("\nSample Attendance:")
-    print(attendance)
-    
-    print("\n✓ Models defined successfully!")

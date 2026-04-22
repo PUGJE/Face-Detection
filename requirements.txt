@@ -80,6 +80,7 @@ websockets==16.0
 click==8.3.1
 tqdm==4.67.3
 PyYAML==6.0.3
+redis>=5.0.0              # optional — scan cooldown cache; falls back to in-memory dict if unavailable
 
 # Type / annotation support
 annotated-types==0.7.0

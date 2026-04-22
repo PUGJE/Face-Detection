@@ -54,3 +54,5 @@ Thumbs.db
 # Model weights (downloaded at runtime)
 models/facenet_model/
 models/anti_spoofing_model/
+
+changes_to_be_made.md

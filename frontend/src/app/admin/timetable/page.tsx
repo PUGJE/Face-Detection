@@ -6,8 +6,6 @@ import { AdminGuard } from "@/components/AdminGuard";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
-// Use relative URL — Next.js proxy forwards /api/* → FastAPI
-const API = "";
 
 interface Slot {
   id: number;
@@ -51,7 +49,7 @@ export default function TimetableManagerPage() {
     setLoading(true);
     setError("");
     try {
-      const res  = await fetch(`${API}/api/timetable`);
+      const res  = await fetch(`/api/timetable`);
       const data = await res.json();
       setSlots(data.data ?? []);
     } catch {
@@ -63,7 +61,7 @@ export default function TimetableManagerPage() {
 
   async function fetchActive() {
     try {
-      const res  = await fetch(`${API}/api/timetable/active`);
+      const res  = await fetch(`/api/timetable/active`);
       const data = await res.json();
       setActiveSlot(data.active ? data.data : null);
     } catch {
@@ -97,7 +95,7 @@ export default function TimetableManagerPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const url    = editingId ? `${API}/api/timetable/${editingId}` : `${API}/api/timetable`;
+      const url    = editingId ? `/api/timetable/${editingId}` : `/api/timetable`;
       const method = editingId ? "PUT" : "POST";
       const res    = await fetch(url, {
         method,
@@ -124,7 +122,7 @@ export default function TimetableManagerPage() {
   async function confirmDelete() {
     if (!deleteId) return;
     try {
-      await fetch(`${API}/api/timetable/${deleteId}`, { method: "DELETE" });
+      await fetch(`/api/timetable/${deleteId}`, { method: "DELETE" });
       setDeleteId(null);
       await fetchSlots();
     } catch {

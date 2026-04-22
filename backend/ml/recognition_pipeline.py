@@ -33,7 +33,7 @@ def _get_insightface():
     try:
         from insightface.app import FaceAnalysis
         app = FaceAnalysis(name="buffalo_sc", providers=["CPUExecutionProvider"])
-        app.prepare(ctx_id=0, det_size=(640, 640))
+        app.prepare(ctx_id=0, det_size=(320, 320))
         _insightface_app = app
         logger.info("InsightFace (RetinaFace + ArcFace) initialised successfully.")
     except Exception as e:

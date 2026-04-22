@@ -12,6 +12,7 @@ Business logic lives in backend/api/routes/ and backend/services/.
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -22,6 +23,7 @@ from fastapi.staticfiles import StaticFiles
 from backend.database.connection import init_database
 from backend.config import settings
 from backend.api.routes import health, students, faces, attendance
+from backend.api.dependencies import get_attendance_system
 
 # ---------------------------------------------------------------------------
 # Logging — configured once at the application entry point
@@ -40,8 +42,10 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Run startup tasks before the server accepts requests."""
     logger.info("Starting up …")
-    settings.create_directories()   # ensure data dirs exist
-    init_database()                  # create tables if needed
+    settings.create_directories()
+    init_database()
+    # Eagerly load InsightFace + embeddings so the first request is instant
+    get_attendance_system()
     logger.info(f"Listening at http://{settings.host}:{settings.port}")
     logger.info(f"API docs at  http://{settings.host}:{settings.port}/docs")
     yield
@@ -60,10 +64,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow all origins in development; restrict in production
+# CORS — restrict to configured origins (set ALLOWED_ORIGINS env var in production)
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
+ALLOWED_ORIGINS = [o.strip() for o in _raw_origins.split(",")]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

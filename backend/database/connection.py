@@ -165,27 +165,3 @@ def init_database():
     db_manager.create_tables()
     logger.info("Database initialised.")
 
-
-# ---------------------------------------------------------------------------
-# Manual smoke-test
-# ---------------------------------------------------------------------------
-if __name__ == "__main__":
-    print("=" * 60)
-    print("DATABASE CONNECTION TEST")
-    print("=" * 60)
-
-    print("\nChecking connectivity …")
-    ok = db_manager.health_check()
-    print(f"  Health check: {'✓ OK' if ok else '✗ FAILED'}")
-
-    if ok:
-        print("\nInitialising tables …")
-        init_database()
-
-        with db_manager.session_scope() as s:
-            students = s.query(Student).count()
-            records  = s.query(Attendance).count()
-            print(f"  Students : {students}")
-            print(f"  Attendance records: {records}")
-
-        print(f"\n✓ Connected to: {db_manager._safe_url()}")
