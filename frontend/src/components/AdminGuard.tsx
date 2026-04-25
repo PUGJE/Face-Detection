@@ -33,6 +33,7 @@ export function AdminGuard({ children }: AdminGuardProps) {
   // Check sessionStorage on first render
   useEffect(() => {
     if (sessionStorage.getItem(SESSION_KEY) === "true") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setUnlocked(true);
     }
   }, []);

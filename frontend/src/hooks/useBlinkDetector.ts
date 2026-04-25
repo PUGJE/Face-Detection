@@ -77,7 +77,6 @@ function muteWasmLogs() {
   _log   = console.log;
   _warn  = console.warn;
   _error = console.error;
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
   const noop = () => {};
   console.log   = noop;
   console.warn  = noop;
@@ -104,6 +103,7 @@ export interface UseBlinkDetectorResult {
 
 export function useBlinkDetector(): UseBlinkDetectorResult {
   // Model refs — never trigger re-renders
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const landmarkerRef    = useRef<any>(null);
   const landmarkerReady  = useRef(false);
   const lastTsRef        = useRef(-1);     // last submitted timestamp (ms)
@@ -133,6 +133,7 @@ export function useBlinkDetector(): UseBlinkDetectorResult {
         const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_CDN);
 
         muteWasmLogs();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let fl: any;
         try {
           fl = await FaceLandmarker.createFromOptions(vision, {

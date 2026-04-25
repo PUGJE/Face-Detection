@@ -61,6 +61,7 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function fetchAll() {
@@ -76,8 +77,8 @@ export default function AdminDashboardPage() {
       if (!res.ok) throw new Error("Failed to fetch statistics");
       const data = await res.json();
       setStats(data.data ?? []);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }

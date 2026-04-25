@@ -56,3 +56,4 @@ models/facenet_model/
 models/anti_spoofing_model/
 
 changes_to_be_made.md
+.envrc

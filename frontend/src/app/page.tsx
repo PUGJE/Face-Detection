@@ -8,7 +8,7 @@ async function getStats() {
     });
     if (!res.ok) throw new Error("Failed to fetch stats");
     return res.json();
-  } catch (error) {
+  } catch {
     return { success: false, data: null };
   }
 }

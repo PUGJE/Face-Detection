@@ -278,8 +278,8 @@ export default function AttendancePage() {
       scanTimerRef.current    = setInterval(captureAndScan,          SCAN_INTERVAL_MS);
       pollTimerRef.current    = setInterval(fetchTodayLogs,          LOG_POLL_INTERVAL_MS);
       classTimerRef.current   = setInterval(fetchActiveClass,        CLASS_POLL_INTERVAL_MS);
-    } catch (err: any) {
-      setWebcamError(err?.message ?? "Camera permission denied or unavailable.");
+    } catch (err: unknown) {
+      setWebcamError(err instanceof Error ? err.message : "Camera permission denied or unavailable.");
     }
   }
 

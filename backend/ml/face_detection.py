@@ -11,7 +11,7 @@ fails, and for standalone testing.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -32,8 +32,21 @@ class FaceDetector:
     def __init__(self, min_detection_confidence: float = 0.5, model_selection: int = 0):
         self.min_detection_confidence = min_detection_confidence
         
+        import os
+        import sys
+        
         # Load OpenCV native frontal-face Haar cascade
-        cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+        cascade_name = 'haarcascade_frontalface_default.xml'
+        
+        if hasattr(cv2, 'data') and hasattr(cv2.data, 'haarcascades'):
+            cascade_path = os.path.join(cv2.data.haarcascades, cascade_name)
+        else:
+            # Fallback for Nix environments or system OpenCV installations
+            cascade_path = os.path.join(sys.prefix, 'share', 'opencv4', 'haarcascades', cascade_name)
+            if not os.path.exists(cascade_path):
+                # Try typical Linux system path as a last resort
+                cascade_path = os.path.join('/usr/share/opencv4/haarcascades', cascade_name)
+                
         self.detector = cv2.CascadeClassifier(cascade_path)
         
         if self.detector.empty():

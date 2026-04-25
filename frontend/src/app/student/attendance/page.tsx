@@ -51,8 +51,8 @@ export default function StudentAttendancePage() {
       const data = await res.json();
       setHistory(data.data ?? []);
       setFetched(true);
-    } catch (err: any) {
-      setError(err.message ?? "Failed to fetch records");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to fetch records");
     } finally {
       setLoading(false);
     }

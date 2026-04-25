@@ -27,11 +27,13 @@ const MODEL_URL =
 
 
 export function useMediaPipeDetector(): {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   detectorRef: React.MutableRefObject<any>;
   detectorStatus: DetectorStatus;
   setDetectorStatus: React.Dispatch<React.SetStateAction<DetectorStatus>>;
 } {
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const detectorRef = useRef<any>(null);
   const [detectorStatus, setDetectorStatus] =
     useState<DetectorStatus>("loading");
